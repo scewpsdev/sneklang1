@@ -1,0 +1,95 @@
+// This is a line comment
+/*
+	This is a block comment
+*/
+
+/*
+	TODO
+	//- while loops
+	//- references
+	- arrays
+	//- structs
+	- strings
+	//- for loops
+	- modules
+	- floats
+	- hex, binary literals
+*/
+
+ext putchar(i32 char);
+
+/*
+def func(i32 arg) {
+	def foo() {
+		putchar(100);
+	};
+	putchar(arg);
+	foo();
+};
+
+num = 50 * 2 + 2 - 1;
+char = 'U';
+bool = true;
+tmp = 99 + (bool);
+func(tmp);
+putchar(99);
+putchar(10);
+
+var = num--;
+putchar(var);
+putchar('Ä');
+ree = 102;
+if num == 100 || ree > 105 {
+	putchar(97);
+} else {
+	putchar(100);
+};
+putchar(10);
+
+i = 0;
+loop {
+	putchar('R' + i++);
+	if i + 'R' - 1 == 'V' continue;
+	putchar('G');
+	if i == 11 break;
+};
+
+*/
+
+/*
+for 10 {
+	putchar('0' + __it);
+};
+for i, 10 {
+	putchar('A' + i);
+};
+for i, 2, 10 {
+	putchar('0' + i);
+};
+for i, 0, 10, 2 {
+	putchar('A' + i);
+};
+putchar(10);
+
+type Foo {
+	i32 a,
+	i32 b;
+
+	def doStuff(i32 num) {
+		(*this).a -= num;
+	}
+};
+
+foo = Foo();
+foo.a = '9';
+putchar(foo.a);
+foo.doStuff(5);
+putchar(foo.a);
+*/
+
+a = [0, 48, 2];
+putchar(a[1]);
+a[2] = 49;
+putchar(a[2]);
+
+putchar(10);

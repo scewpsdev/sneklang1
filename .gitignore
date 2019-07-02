@@ -1,0 +1,12 @@
+/.vs
+/dep
+/out
+/src_cpp
+
+a.exe
+lld-link.exe
+msvcrt.dll
+msvcrt.lib
+snekc.vcxproj
+snekc.vcxproj.filters
+snekc.vcxproj.user
