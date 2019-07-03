@@ -1,17 +1,18 @@
-#pragma once
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-class InputStream {
-	int pos = 0, line = 1, col = 1;
-	const std::string& input;
-public:
-	InputStream(const std::string& input);
+typedef struct INPUTSTREAM_t {
+	char* buffer;
+	char* ptr;
+	int line, col;
+} INPUTSTREAM;
 
-	char next();
-	char peek(int off = 0);
-	void reset();
-	bool eof();
-	void error(const std::string& msg, int line, int col);
+INPUTSTREAM input_new(char* buffer);
+void input_delete(INPUTSTREAM i);
 
-	int getLine() { return line; }
-	int getCol() { return col; }
-};
+char input_next(INPUTSTREAM* i);
+char input_peek(INPUTSTREAM* i);
+bool eof();
+
+void error(INPUTSTREAM* i, const char* msg, int line, int col);

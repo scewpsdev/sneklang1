@@ -1,32 +1,23 @@
-#pragma once
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-#include "input.h"
+typedef struct TOKEN_t {
+	uint8_t type;
+	char* value;
+} TOKEN;
 
-class Token {
-public:
-	const static Token Null;
-public:
-	std::string type;
-	std::string value;
-};
+typedef struct LEXER_t {
+	INPUTSTREAM* input;
+} LEXER;
 
-class Lexer {
-public:
-	Lexer(InputStream* input);
+LEXER lexer_new(INPUTSTREAM* input);
+void lexer_delete(LEXER lexer);
 
-	Token peek();
-	Token next();
-	bool eof();
-	void error(const std::string& msg);
-};
+TOKEN read_next();
+TOKEN next();
+TOKEN peek();
+bool eof();
 
-namespace lexer {
-	extern InputStream* input;
-
-	bool is_whitespace(char ch);
-	std::string read_while(bool(*predicate)(char));
-	void skip_line_comment();
-	void skip_block_comment();
-
-	Token read_next();
-}
+void error(LEXER* l, const char* msg);
