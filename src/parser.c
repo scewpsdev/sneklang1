@@ -1,14 +1,16 @@
-#include "lexer.h"
+#include "parser.h"
 
-LEXER lexer_new(INPUTSTREAM* input) {
-	LEXER l;
-	l.input = input;
-	return l;
+PARSER parser_new(LEXER* lexer) {
+	PARSER p;
+	p.input = lexer;
+	return p;
 }
 
-void lexer_delete(LEXER l) {
+void parser_delete(PARSER parser) {
 }
 
-TOKEN read_next(LEXER* l) {
-	
+AST parse_toplevel(PARSER* p) {
+	AST ast;
+	ast.statements = NULL;
+	return ast;
 }

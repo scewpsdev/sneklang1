@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "lexer.h"
+#include "ast.h"
 
 typedef struct PARSER_t {
 	LEXER* input;
@@ -12,12 +13,4 @@ typedef struct PARSER_t {
 PARSER parser_new(LEXER* lexer);
 void parser_delete(PARSER parser);
 
-LEXER lexer_new(INPUTSTREAM* input);
-void lexer_delete(LEXER lexer);
-
-TOKEN read_next();
-TOKEN next();
-TOKEN peek();
-bool eof();
-
-void error(LEXER* l, const char* msg);
+AST parse_toplevel(PARSER* p);

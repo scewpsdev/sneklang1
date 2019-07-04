@@ -1,7 +1,12 @@
+#pragma once
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+
+#include "input.h"
+
+#define TOKEN_NULL 0x00
 
 typedef struct TOKEN_t {
 	uint8_t type;
@@ -15,9 +20,8 @@ typedef struct LEXER_t {
 LEXER lexer_new(INPUTSTREAM* input);
 void lexer_delete(LEXER lexer);
 
-TOKEN read_next();
-TOKEN next();
-TOKEN peek();
-bool eof();
+TOKEN lexer_next(LEXER* l);
+TOKEN lexer_peek(LEXER* l);
+bool lexer_eof(LEXER* l);
 
-void error(LEXER* l, const char* msg);
+void lexer_error(LEXER* l, const char* msg);

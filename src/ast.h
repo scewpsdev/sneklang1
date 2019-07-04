@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-struct EXPRESSION_t;
+typedef struct EXPRESSION_t EXPRESSION;
 
 typedef struct INT_t {
 	int64_t value;
@@ -31,29 +31,29 @@ typedef struct IDENTIFIER_t {
 	char* name;
 } IDENTIFIER;
 
-typedef EXPRESSION_t* ARGUMENT;
+typedef struct EXPRESSION_t* ARGUMENT;
 
 typedef struct FUNC_CALL_t {
-	EXPRESSION_t* callee;
+	EXPRESSION* callee;
 	ARGUMENT* args;
 } FUNC_CALL;
 
 typedef struct ASSIGN_t {
 	uint8_t op;
-	EXPRESSION_t* left;
-	EXPRESSION_t* right;
+	EXPRESSION* left;
+	EXPRESSION* right;
 } ASSIGN;
 
 typedef struct BINARY_OP_t {
 	uint8_t op;
-	EXPRESSION_t* left;
-	EXPRESSION_t* right;
+	EXPRESSION* left;
+	EXPRESSION* right;
 } BINARY_OP;
 
 typedef struct UNARY_OP_t {
 	uint8_t op;
 	bool position;
-	EXPRESSION_t* expr;
+	EXPRESSION* expr;
 } UNARY_OP;
 
 typedef struct EXPRESSION_t {

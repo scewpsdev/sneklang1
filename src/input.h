@@ -1,4 +1,6 @@
+#pragma once
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -13,6 +15,6 @@ void input_delete(INPUTSTREAM i);
 
 char input_next(INPUTSTREAM* i);
 char input_peek(INPUTSTREAM* i);
-bool eof();
+bool input_eof(INPUTSTREAM* i);
 
-void error(INPUTSTREAM* i, const char* msg, int line, int col);
+void input_error(INPUTSTREAM* i, const char* msg, int line, int col);
