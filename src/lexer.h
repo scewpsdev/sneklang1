@@ -6,7 +6,9 @@
 
 #include "input.h"
 
-#define TOKEN_NULL 0x00
+#define TOKEN_NULL (TOKEN) {0}
+
+#define TOKEN_TYPE_NULL 0x00
 
 typedef struct TOKEN_t {
 	uint8_t type;
@@ -15,6 +17,7 @@ typedef struct TOKEN_t {
 
 typedef struct LEXER_t {
 	INPUTSTREAM* input;
+	TOKEN current;
 } LEXER;
 
 LEXER lexer_new(INPUTSTREAM* input);
