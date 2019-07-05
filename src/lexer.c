@@ -45,7 +45,11 @@ bool is_punc(char c) {
 }
 
 bool is_op(char c) {
-	return c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == 
+	return c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '=' || c == '&' || c == '|' || c == '<' || c == '>' || c == '!';
+}
+
+bool is_digit(char c) {
+	return isdigit(c) || c == '-';
 }
 
 bool not_newline(char c) {
@@ -57,7 +61,7 @@ bool not_block_comment_end(char c, char c2) {
 }
 
 char* read_while(LEXER* l, bool(*parser)(char)) {
-	STRING result = string_new(10);
+	DYNAMIC_STRING result = string_new(10);
 	while (!input_eof(l->input) && parser(input_peek(l->input))) {
 		string_append(&result, input_next(l->input));
 	}
@@ -65,17 +69,17 @@ char* read_while(LEXER* l, bool(*parser)(char)) {
 }
 
 char* read_while2(LEXER* l, bool(*parser)(char, char)) {
-	STRING result = string_new(10);
-	while(!input_eof(l->input) && parser(input_peek(l->input), input_peek_n(l->input, 1))) {
+	DYNAMIC_STRING result = string_new(10);
+	while (!input_eof(l->input) && parser(input_peek(l->input), input_peek_n(l->input, 1))) {
 		string_append(&result, input_next(l->input));
 	}
 	return result.buffer;
 }
 
-char* read_escaped(char end) {
-	STRING result = string_new(100);
+char* read_escaped(LEXER* l, char end) {
+	DYNAMIC_STRING result = string_new(100);
 	bool esc = false;
-	while(!input_eof(l->input)) {
+	while (!input_eof(l->input)) {
 		char c = input_next(l->input);
 		if (esc) {
 			// TODO
@@ -94,25 +98,30 @@ TOKEN read_identifier(LEXER* l) {
 }
 
 TOKEN read_string(LEXER* l) {
-	input_next(l);
-	return (TOKEN) { TOKEN_TYPE_STRING, read_escaped('"') };
+	input_next(l->input);
+	return (TOKEN) { TOKEN_TYPE_STRING, read_escaped(l, '"') };
 }
 
 TOKEN read_char(LEXER* l) {
-	return (TOKEN) { TOKEN_TYPE_CHAR, read_escaped('\'') };
+	return (TOKEN) { TOKEN_TYPE_CHAR, read_escaped(l, '\'') };
+}
+
+TOKEN read_int(LEXER* l) {
+	char* str = read_while(l, is_digit);
+	return (TOKEN) { TOKEN_TYPE_INT, str };
 }
 
 void skip_line_comment(LEXER* l) {
 	input_next(l->input);
 	input_next(l->input);
-	free(read_while2(l, not_newline));
+	free(read_while(l, not_newline));
 	input_next(l->input);
 }
 
 void skip_block_comment(LEXER* l) {
 	input_next(l->input);
 	input_next(l->input);
-	free(read_while(l, not_block_comment_end));
+	free(read_while2(l, not_block_comment_end));
 	input_next(l->input);
 	input_next(l->input);
 }
@@ -129,11 +138,11 @@ TOKEN read_next(LEXER* l) {
 		return read_next(l);
 	} else if (next == '/' && next2 == '*') {
 		skip_block_comment(l);
-		return read_next();
+		return read_next(l);
 	}
 
-	if (c == '"') return read_string();
-	if (c == '\'') return read_char();
+	if (next == '"') return read_string(l);
+	if (next == '\'') return read_char(l);
 	if (is_identifier(next)) return read_identifier(l);
 	if (is_int(next, next2)) return read_int(l);
 	if (is_punc(next)) {
@@ -142,7 +151,7 @@ TOKEN read_next(LEXER* l) {
 		value[1] = 0;
 		return (TOKEN) { TOKEN_TYPE_PUNC, value };
 	}
-	if (is_op(next)) return (TOKEN) { TOKEN_TYPE_OP, read_while(is_op) };
+	if (is_op(next)) return (TOKEN) { TOKEN_TYPE_OP, read_while(l, is_op) };
 
 	lexer_error(l, "Can't handle character '%c'", next);
 	return TOKEN_NULL;

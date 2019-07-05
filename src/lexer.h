@@ -1,4 +1,5 @@
 #pragma once
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -14,6 +15,9 @@
 #define TOKEN_TYPE_KEYWORD 0x11
 #define TOKEN_TYPE_STRING 0x12
 #define TOKEN_TYPE_CHAR 0x13
+#define TOKEN_TYPE_INT 0x14
+#define TOKEN_TYPE_PUNC 0x15
+#define TOKEN_TYPE_OP 0x16
 
 typedef struct TOKEN_t {
 	uint8_t type;
