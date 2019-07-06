@@ -13,6 +13,6 @@ typedef struct PARSER_t {
 } PARSER;
 
 PARSER parser_new(LEXER* lexer);
-void parser_delete(PARSER parser);
+void parser_delete(PARSER* parser);
 
-AST parse_toplevel(PARSER* p);
+AST parse_ast(PARSER* p);

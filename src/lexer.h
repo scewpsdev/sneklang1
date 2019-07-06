@@ -9,15 +9,17 @@
 
 #define TOKEN_NULL (TOKEN) {0}
 
-#define TOKEN_TYPE_NULL 0x00
-
-#define TOKEN_TYPE_IDENTIFIER 0x10
-#define TOKEN_TYPE_KEYWORD 0x11
-#define TOKEN_TYPE_STRING 0x12
-#define TOKEN_TYPE_CHAR 0x13
-#define TOKEN_TYPE_INT 0x14
-#define TOKEN_TYPE_PUNC 0x15
-#define TOKEN_TYPE_OP 0x16
+enum TOKEN_TYPE {
+	TOKEN_TYPE_NULL,
+	TOKEN_TYPE_INT,
+	TOKEN_TYPE_CHAR,
+	TOKEN_TYPE_FLOAT,
+	TOKEN_TYPE_STRING,
+	TOKEN_TYPE_IDENTIFIER,
+	TOKEN_TYPE_KEYWORD,
+	TOKEN_TYPE_PUNC,
+	TOKEN_TYPE_OP
+};
 
 typedef struct TOKEN_t {
 	uint8_t type;
@@ -27,10 +29,11 @@ typedef struct TOKEN_t {
 typedef struct LEXER_t {
 	INPUTSTREAM* input;
 	TOKEN current;
+	long line, col;
 } LEXER;
 
 LEXER lexer_new(INPUTSTREAM* input);
-void lexer_delete(LEXER lexer);
+void lexer_delete(LEXER* lexer);
 
 TOKEN lexer_next(LEXER* l);
 TOKEN lexer_peek(LEXER* l);

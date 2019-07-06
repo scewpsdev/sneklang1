@@ -5,6 +5,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+enum EXPR_TYPE {
+	EXPR_TYPE_NULL,
+	EXPR_TYPE_INT,
+	EXPR_TYPE_CHAR,
+	EXPR_TYPE_BOOL,
+	EXPR_TYPE_FLOAT,
+	EXPR_TYPE_STRING,
+	EXPR_TYPE_IDENTIFIER
+};
+
 typedef struct EXPRESSION_t EXPRESSION;
 
 typedef struct INT_t {
@@ -59,9 +69,16 @@ typedef struct UNARY_OP_t {
 typedef struct EXPRESSION_t {
 	uint8_t type;
 	union {
-		INT i;
+		INT int_literal;
+		CHAR char_literal;
+		BOOL bool_literal;
+		FLOAT float_literal;
+		STRING string_literal;
+		IDENTIFIER identifier;
 	};
 } EXPRESSION;
+
+#define STATEMENT_TYPE_EXPR 0x10
 
 typedef struct EXPR_STATEMENT_t {
 	EXPRESSION expr;
@@ -69,8 +86,12 @@ typedef struct EXPR_STATEMENT_t {
 
 typedef struct STATEMENT_t {
 	uint8_t type;
+	union {
+		EXPR_STATEMENT expr;
+	};
 } STATEMENT;
 
 typedef struct AST_t {
 	STATEMENT* statements;
+	uint64_t num_statements;
 } AST;

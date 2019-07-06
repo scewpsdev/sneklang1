@@ -6,8 +6,12 @@
 
 #include "utils.h"
 
+#define KEYWORD_TRUE "true"
+#define KEYWORD_FALSE "false"
+
 const char* KEYWORDS[] = {
-	"world",
+	KEYWORD_TRUE,
+	KEYWORD_FALSE,
 	""
 };
 
@@ -15,10 +19,12 @@ LEXER lexer_new(INPUTSTREAM* input) {
 	LEXER l;
 	l.input = input;
 	l.current = TOKEN_NULL;
+	l.line = 1;
+	l.col = 1;
 	return l;
 }
 
-void lexer_delete(LEXER l) {
+void lexer_delete(LEXER* l) {
 }
 
 bool is_whitespace(char c) {
@@ -36,8 +42,8 @@ bool is_keyword(char* str) {
 	return false;
 }
 
-bool is_int(char c, char c2) {
-	return isdigit(c) || c == '-' && isdigit(c2);
+bool is_num(char c, char c2) {
+	return isdigit(c) || c == '-' && isdigit(c2) || c == '.' && isdigit(c2);
 }
 
 bool is_punc(char c) {
@@ -49,7 +55,7 @@ bool is_op(char c) {
 }
 
 bool is_digit(char c) {
-	return isdigit(c) || c == '-';
+	return isdigit(c) || c == '-' || c == '.';
 }
 
 bool not_newline(char c) {
@@ -63,7 +69,7 @@ bool not_block_comment_end(char c, char c2) {
 char* read_while(LEXER* l, bool(*parser)(char)) {
 	DYNAMIC_STRING result = string_new(10);
 	while (!input_eof(l->input) && parser(input_peek(l->input))) {
-		string_append(&result, input_next(l->input));
+		string_push(&result, input_next(l->input));
 	}
 	return result.buffer;
 }
@@ -71,7 +77,7 @@ char* read_while(LEXER* l, bool(*parser)(char)) {
 char* read_while2(LEXER* l, bool(*parser)(char, char)) {
 	DYNAMIC_STRING result = string_new(10);
 	while (!input_eof(l->input) && parser(input_peek(l->input), input_peek_n(l->input, 1))) {
-		string_append(&result, input_next(l->input));
+		string_push(&result, input_next(l->input));
 	}
 	return result.buffer;
 }
@@ -83,18 +89,30 @@ char* read_escaped(LEXER* l, char end) {
 		char c = input_next(l->input);
 		if (esc) {
 			// TODO
-			string_append(&result, c);
+			string_push(&result, c);
 			esc = false;
 		} else if (c == '\\') esc = true;
 		else if (c == end) break;
-		else string_append(&result, c);
+		else string_push(&result, c);
 	}
 	return result.buffer;
 }
 
-TOKEN read_identifier(LEXER* l) {
-	char* value = read_while(l, is_identifier);
-	return (TOKEN) { is_keyword(value) ? TOKEN_TYPE_KEYWORD : TOKEN_TYPE_IDENTIFIER, value };
+TOKEN read_number(LEXER* l) {
+	char* str = read_while(l, is_digit);
+	bool fpoint = false;
+	for (int i = 0; str[i] != 0; i++) {
+		if (str[i] == '.') {
+			fpoint = true;
+			break;
+		}
+	}
+	return (TOKEN) { fpoint ? TOKEN_TYPE_FLOAT : TOKEN_TYPE_INT, str };
+}
+
+TOKEN read_char(LEXER* l) {
+	input_next(l->input);
+	return (TOKEN) { TOKEN_TYPE_CHAR, read_escaped(l, '\'') };
 }
 
 TOKEN read_string(LEXER* l) {
@@ -102,13 +120,9 @@ TOKEN read_string(LEXER* l) {
 	return (TOKEN) { TOKEN_TYPE_STRING, read_escaped(l, '"') };
 }
 
-TOKEN read_char(LEXER* l) {
-	return (TOKEN) { TOKEN_TYPE_CHAR, read_escaped(l, '\'') };
-}
-
-TOKEN read_int(LEXER* l) {
-	char* str = read_while(l, is_digit);
-	return (TOKEN) { TOKEN_TYPE_INT, str };
+TOKEN read_identifier(LEXER* l) {
+	char* value = read_while(l, is_identifier);
+	return (TOKEN) { is_keyword(value) ? TOKEN_TYPE_KEYWORD : TOKEN_TYPE_IDENTIFIER, value };
 }
 
 void skip_line_comment(LEXER* l) {
@@ -143,8 +157,8 @@ TOKEN read_next(LEXER* l) {
 
 	if (next == '"') return read_string(l);
 	if (next == '\'') return read_char(l);
+	if (is_num(next, next2)) return read_number(l);
 	if (is_identifier(next)) return read_identifier(l);
-	if (is_int(next, next2)) return read_int(l);
 	if (is_punc(next)) {
 		char* value = malloc(2);
 		value[0] = input_next(l->input);
@@ -160,6 +174,8 @@ TOKEN read_next(LEXER* l) {
 TOKEN lexer_next(LEXER* l) {
 	TOKEN tok = l->current;
 	l->current = TOKEN_NULL;
+	l->line = l->input->line;
+	l->col = l->input->col;
 	return tok.type != TOKEN_TYPE_NULL ? tok : read_next(l);
 }
 
@@ -174,6 +190,6 @@ bool lexer_eof(LEXER* l) {
 void lexer_error(LEXER* l, const char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
-	input_error(l->input, msg, 0, 0, args);
+	input_error(l->input, msg, l->line, l->col, args);
 	va_end(args);
 }

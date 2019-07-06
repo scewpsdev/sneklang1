@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <memory.h>
 
+DEF_DYNAMIC_VECTOR_TERMINATED(char, DYNAMIC_STRING, string, 0)
+DEF_DYNAMIC_VECTOR(STATEMENT, STATEMENT_VEC, stvec)
+
+/*
 DYNAMIC_STRING string_new(int size) {
 	DYNAMIC_STRING str;
 	str.buffer = malloc(size + 1);
@@ -26,8 +30,25 @@ void string_resize(DYNAMIC_STRING* str, int size) {
 
 void string_append(DYNAMIC_STRING* str, char c) {
 	if (str->length == str->bufsize - 1) {
-		string_resize(str, str->bufsize + 10);
+		string_resize(str, (str->bufsize - 1) * 2 + 1);
 	}
 	str->buffer[str->length++] = c;
 	str->buffer[str->length] = 0;
 }
+
+STATEMENT_VEC statement_vec_new(int size) {
+
+}
+
+void statement_vec_delete(STATEMENT_VEC str) {
+
+}
+
+void statement_vec_resize(STATEMENT_VEC* str, int size) {
+
+}
+
+void statement_vec_append(STATEMENT_VEC* str, char c) {
+	
+}
+*/

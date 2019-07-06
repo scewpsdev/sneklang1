@@ -9,8 +9,8 @@ INPUTSTREAM input_new(char* buffer) {
 	return i;
 }
 
-void input_delete(INPUTSTREAM i) {
-	free(i.buffer);
+void input_delete(INPUTSTREAM* i) {
+	free(i->buffer);
 }
 
 char input_next(INPUTSTREAM* i) {
@@ -35,9 +35,16 @@ bool input_eof(INPUTSTREAM* i) {
 	return *i->ptr == 0;
 }
 
+void input_reset(INPUTSTREAM* i) {
+	i->ptr = i->buffer;
+	i->line = 1;
+	i->col = 1;
+}
+
 void input_error(INPUTSTREAM* i, const char* msg, int line, int col, va_list args) {
 	if (line == -1) line = i->line;
 	if (col == -1) col = i->col;
 	printf("(%d,%d) ", line, col);
 	vprintf(msg, args);
+	putchar('\n');
 }
