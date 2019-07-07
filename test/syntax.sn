@@ -1,57 +1,52 @@
-// This is a line comment
+//This is a line comment
 /*
 	This is a block comment
 */
-imp cmd
-imp file
-imp string
-imp array
+load(cmd);
+load(file);
+load(string);
+load(array);
 
-cmd.write(a = null)
-cmd.write(b = 5)
-cmd.write(c = "hello world")
-cmd.write(d = true)
-cmd.write(e = 'c')
-cmd.write(f = [a, b, c, d, e])
-b = 5
-abc = {
-	cmd.write(b)
+cmd.write(a = null);
+cmd.write(b = 5);
+cmd.write(c = 'c');
+cmd.write(d = true);
+cmd.write(e = 0.5);
+cmd.write(f = "hello world");
+cmd.write(g = [1, 2, 3, 4, 5]);
+
+content = file.open("input.txt").read();
+numbers = <i32[]>(string.split(content, '\n'));
+file.open("output.txt").write(numbers);
+cmd.write(sum = array.sum(numbers));
+if true {
+	cmd.write("true");
+} else {
+	cmd.write("false");
 }
-cmd.write(4)
-abc()
 
-content = file.read("input.txt")
-numbers = toInt(string.split(content, "\n"))
-file.write("output.txt", numbers)
-cmd.write(sum = array.sum(numbers))
-cmd.write(var = sum < 562 ? {
-	cmd.write("a")
-	ret 3
-} : {
-	cmd.write("b")
-	ret 5
-})
-
-sum = i = 0
-while i < numbers.length {
-	i %= numbers.length
-	sum += numbers[i++]
+while sum = i = 0 < numbers.length {
+	i %= numbers.length;
+	sum += numbers[i++];
 }
-cmd.write(sum)
+cmd.write("Sum: " + sum);
 
-l = 6
-r = 3
-cmd.write(l + r)
-cmd.write(l - r)
-cmd.write(l * r)
-cmd.write(l / r)
-cmd.write(l % r)
-cmd.write(l == r)
-cmd.write(l < r)
-cmd.write(l <= r)
-cmd.write(l > r)
-cmd.write(l >= r)
-cmd.write(l && r)
-cmd.write(l || r)
-
-cmd.write("---")
+l = 6;
+r = 3;
+l + r;
+l - r;
+l * r;
+l / r;
+l % r;
+l << r;
+l >> r;
+l & r;
+l | r;
+l ^ r;
+l == r;
+l < r;
+l <= r;
+l > r;
+l >= r;
+l && r;
+l || r;
