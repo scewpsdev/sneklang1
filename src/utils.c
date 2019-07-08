@@ -5,6 +5,8 @@
 
 DEF_DYNAMIC_VECTOR_TERMINATED(char, DYNAMIC_STRING, string, 0)
 DEF_DYNAMIC_VECTOR(STATEMENT, STATEMENT_VEC, stvec)
+DEF_DYNAMIC_VECTOR(VAR_DECL, VAR_DECL_VEC, vdvec)
+DEF_DYNAMIC_VECTOR(EXPRESSION, EXPR_VEC, evec)
 
 /*
 DYNAMIC_STRING string_new(int size) {
@@ -49,6 +51,6 @@ void statement_vec_resize(STATEMENT_VEC* str, int size) {
 }
 
 void statement_vec_append(STATEMENT_VEC* str, char c) {
-	
+
 }
 */

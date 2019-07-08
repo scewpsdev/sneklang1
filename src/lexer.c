@@ -5,13 +5,12 @@
 #include <stdarg.h>
 
 #include "utils.h"
-
-#define KEYWORD_TRUE "true"
-#define KEYWORD_FALSE "false"
+#include "keywords.h"
 
 const char* KEYWORDS[] = {
 	KEYWORD_TRUE,
 	KEYWORD_FALSE,
+	KEYWORD_FUNC_DECL,
 	""
 };
 

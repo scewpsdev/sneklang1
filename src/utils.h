@@ -9,7 +9,7 @@ typedef struct name##_t {\
 	long capacity;\
 } name;\
 name prefix##_new(long size);\
-void prefix##_delete(name v);\
+void prefix##_delete(name* v);\
 void prefix##_resize(name* v, long size);\
 void prefix##_push(name* v, element e);
 
@@ -17,8 +17,8 @@ void prefix##_push(name* v, element e);
 name prefix##_new(long size) {\
 	return (name) { malloc(size * sizeof(element)), 0, size };\
 }\
-void prefix##_delete(name v) {\
-	free(v.buffer);\
+void prefix##_delete(name* v) {\
+	free(v->buffer);\
 }\
 void prefix##_resize(name* v, long size) {\
 	element* newbuf = realloc(v->buffer, size * sizeof(element));\
@@ -37,8 +37,8 @@ name prefix##_new(long size) {\
 	n.buffer[0] = terminator;\
 	return n;\
 }\
-void prefix##_delete(name v) {\
-	free(v.buffer);\
+void prefix##_delete(name* v) {\
+	free(v->buffer);\
 }\
 void prefix##_resize(name* v, long size) {\
 	element* newbuf = realloc(v->buffer, (size + 1) * sizeof(element));\
@@ -55,6 +55,8 @@ void prefix##_push(name* v, element e) {\
 
 DECL_DYNAMIC_VECTOR(char, DYNAMIC_STRING, string)
 DECL_DYNAMIC_VECTOR(STATEMENT, STATEMENT_VEC, stvec)
+DECL_DYNAMIC_VECTOR(VAR_DECL, VAR_DECL_VEC, vdvec)
+DECL_DYNAMIC_VECTOR(EXPRESSION, EXPR_VEC, evec)
 
 /*
 typedef struct DYNAMIC_STRING_t {

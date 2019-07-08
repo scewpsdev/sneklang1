@@ -1,0 +1,3 @@
+decl printf(i8* str);
+
+printf("hello world");
