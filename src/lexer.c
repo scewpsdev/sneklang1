@@ -16,14 +16,22 @@ const char* KEYWORDS[] = {
 
 LEXER lexer_new(INPUTSTREAM* input) {
 	LEXER l;
+
 	l.input = input;
 	l.current = TOKEN_NULL;
 	l.line = 1;
 	l.col = 1;
+
+	l.token_data = strvec_new(64);
+
 	return l;
 }
 
 void lexer_delete(LEXER* l) {
+	for (int i = 0; i < l->token_data.size; i++) {
+		free(l->token_data.buffer[i]);
+	}
+	strvec_delete(&l->token_data);
 }
 
 bool is_whitespace(char c) {
@@ -70,6 +78,7 @@ char* read_while(LEXER* l, bool(*parser)(char)) {
 	while (!input_eof(l->input) && parser(input_peek(l->input))) {
 		string_push(&result, input_next(l->input));
 	}
+	strvec_push(&l->token_data, result.buffer);
 	return result.buffer;
 }
 
@@ -78,6 +87,7 @@ char* read_while2(LEXER* l, bool(*parser)(char, char)) {
 	while (!input_eof(l->input) && parser(input_peek(l->input), input_peek_n(l->input, 1))) {
 		string_push(&result, input_next(l->input));
 	}
+	strvec_push(&l->token_data, result.buffer);
 	return result.buffer;
 }
 
@@ -94,6 +104,7 @@ char* read_escaped(LEXER* l, char end) {
 		else if (c == end) break;
 		else string_push(&result, c);
 	}
+	strvec_push(&l->token_data, result.buffer);
 	return result.buffer;
 }
 
@@ -127,20 +138,20 @@ TOKEN read_identifier(LEXER* l) {
 void skip_line_comment(LEXER* l) {
 	input_next(l->input);
 	input_next(l->input);
-	free(read_while(l, not_newline));
+	read_while(l, not_newline);
 	input_next(l->input);
 }
 
 void skip_block_comment(LEXER* l) {
 	input_next(l->input);
 	input_next(l->input);
-	free(read_while2(l, not_block_comment_end));
+	read_while2(l, not_block_comment_end);
 	input_next(l->input);
 	input_next(l->input);
 }
 
 TOKEN read_next(LEXER* l) {
-	free(read_while(l, is_whitespace));
+	read_while(l, is_whitespace);
 	if (input_eof(l->input)) return TOKEN_NULL;
 
 	char next = input_peek(l->input);
@@ -158,6 +169,7 @@ TOKEN read_next(LEXER* l) {
 		char* value = malloc(2);
 		value[0] = input_next(l->input);
 		value[1] = 0;
+		strvec_push(&l->token_data, value);
 		return (TOKEN) { TOKEN_TYPE_SEPARATOR, value };
 	}
 	if (next == '"') return read_string(l);
@@ -168,6 +180,7 @@ TOKEN read_next(LEXER* l) {
 		char* value = malloc(2);
 		value[0] = input_next(l->input);
 		value[1] = 0;
+		strvec_push(&l->token_data, value);
 		return (TOKEN) { TOKEN_TYPE_PUNC, value };
 	}
 	if (is_op(next)) return (TOKEN) { TOKEN_TYPE_OP, read_while(l, is_op) };

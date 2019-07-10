@@ -83,13 +83,15 @@ EXPRESSION parse_call(PARSER* p, EXPRESSION func) {
 }
 
 TYPE parse_type(PARSER* p) {
-	char* name = lexer_next(p->input).value;
-	bool ptr = false;
+	char* name = NULL;
+	bool cpy = false;
 	if (next_is_op(p, '*')) {
-		ptr = true;
+		cpy = true;
 		skip_op(p, '*');
 	}
-	return (TYPE) { name, ptr };
+	name = lexer_next(p->input).value;
+
+	return (TYPE) { name, cpy };
 }
 
 VAR_DECL parse_arg(PARSER* p) {
@@ -123,6 +125,12 @@ EXPRESSION parse_func_decl(PARSER* p) {
 
 EXPRESSION parse_atom(PARSER* p) {
 	if (next_is_keyword(p, "true") || next_is_keyword(p, "false")) return parse_bool(p);
+	if (next_is_op(p, '*')) {
+		char* op = lexer_next(p->input).value;
+		EXPRESSION* expr = malloc(sizeof(EXPRESSION));
+		*expr = maybe_unary(p, parse_atom(p));
+		return (EXPRESSION) { EXPR_TYPE_UNARY_OP, .unary_op = (UNARY_OP){ op, false, expr } };
+	}
 	if (next_is_keyword(p, KEYWORD_FUNC_DECL)) return parse_func_decl(p);
 
 	TOKEN tok = lexer_next(p->input);

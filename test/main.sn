@@ -1,3 +1,3 @@
-decl putchar(i32 Char)
+decl putchar(*i32 Char)
 
-putchar(99)
+putchar('a')

@@ -6,6 +6,7 @@
 #include <stdbool.h>
 
 #include "input.h"
+#include "utils.h"
 
 #define TOKEN_NULL (TOKEN) {0}
 
@@ -31,6 +32,8 @@ typedef struct LEXER_t {
 	INPUTSTREAM* input;
 	TOKEN current;
 	long line, col;
+
+	STRING_VEC token_data;
 } LEXER;
 
 LEXER lexer_new(INPUTSTREAM* input);

@@ -14,6 +14,8 @@ enum EXPR_TYPE {
 	EXPR_TYPE_STRING_LITERAL,
 	EXPR_TYPE_IDENTIFIER,
 	EXPR_TYPE_FUNC_CALL,
+	EXPR_TYPE_UNARY_OP,
+	EXPR_TYPE_BINARY_OP,
 
 	EXPR_TYPE_FUNC_DECL
 };
@@ -22,7 +24,7 @@ typedef struct EXPRESSION_t EXPRESSION;
 
 typedef struct TYPENAME_t {
 	char* name;
-	bool ptr;
+	bool cpy;
 } TYPE;
 
 typedef struct INT_t {
@@ -68,7 +70,7 @@ typedef struct BINARY_OP_t {
 } BINARY_OP;
 
 typedef struct UNARY_OP_t {
-	uint8_t op;
+	char* op;
 	bool position;
 	EXPRESSION* expr;
 } UNARY_OP;
@@ -94,6 +96,8 @@ typedef struct EXPRESSION_t {
 		STRING string_literal;
 		IDENTIFIER identifier;
 		FUNC_CALL func_call;
+		UNARY_OP unary_op;
+		BINARY_OP binary_op;
 		FUNC_DECL func_decl;
 	};
 } EXPRESSION;

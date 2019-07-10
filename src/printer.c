@@ -54,8 +54,8 @@ void print_func_call(AST_PRINTER* p, FUNC_CALL* func_call) {
 }
 
 void print_type(TYPE t) {
+	if (t.cpy) putchar('*');
 	printf(t.name);
-	if (t.ptr) putchar('*');
 }
 
 void print_arg_list(AST_PRINTER* p, VAR_DECL* args, int num_args) {
