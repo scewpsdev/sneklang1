@@ -53,24 +53,6 @@ void print_func_call(AST_PRINTER* p, FUNC_CALL* func_call) {
 	putchar(')');
 }
 
-void print_expr(AST_PRINTER* p, EXPRESSION* expr) {
-	switch (expr->type) {
-	case EXPR_TYPE_INT: print_int_literal(p, &expr->int_literal); break;
-	case EXPR_TYPE_CHAR: print_char_literal(p, &expr->char_literal); break;
-	case EXPR_TYPE_BOOL: print_bool_literal(p, &expr->bool_literal); break;
-	case EXPR_TYPE_FLOAT: print_float_literal(p, &expr->float_literal); break;
-	case EXPR_TYPE_STRING: print_string_literal(p, &expr->string_literal); break;
-	case EXPR_TYPE_IDENTIFIER: print_identifier(p, &expr->identifier); break;
-	case EXPR_TYPE_FUNC_CALL: print_func_call(p, &expr->func_call); break;
-	default: break;
-	}
-}
-
-void print_expr_statement(AST_PRINTER* p, EXPR_STATEMENT* expr) {
-	print_expr(p, &expr->expr);
-	putchar(';');
-}
-
 void print_type(TYPE t) {
 	printf(t.name);
 	if (t.ptr) putchar('*');
@@ -90,18 +72,24 @@ void print_func_decl(AST_PRINTER* p, FUNC_DECL* func_decl) {
 	printf(");");
 }
 
-void print_statement(AST_PRINTER* p, STATEMENT* statement) {
-	switch (statement->type) {
-	case STATEMENT_TYPE_EXPR: print_expr_statement(p, &statement->expr); break;
-	case STATEMENT_TYPE_FUNC_DECL: print_func_decl(p, &statement->func_decl); break;
+void print_expr(AST_PRINTER* p, EXPRESSION* expr) {
+	switch (expr->type) {
+	case EXPR_TYPE_INT_LITERAL: print_int_literal(p, &expr->int_literal); break;
+	case EXPR_TYPE_CHAR_LITERAL: print_char_literal(p, &expr->char_literal); break;
+	case EXPR_TYPE_BOOL_LITERAL: print_bool_literal(p, &expr->bool_literal); break;
+	case EXPR_TYPE_FLOAT_LITERAL: print_float_literal(p, &expr->float_literal); break;
+	case EXPR_TYPE_STRING_LITERAL: print_string_literal(p, &expr->string_literal); break;
+	case EXPR_TYPE_IDENTIFIER: print_identifier(p, &expr->identifier); break;
+	case EXPR_TYPE_FUNC_CALL: print_func_call(p, &expr->func_call); break;
+	case EXPR_TYPE_FUNC_DECL: print_func_decl(p, &expr->func_decl); break;
 	default: break;
 	}
 }
 
 void print_ast(AST_PRINTER* p, AST* ast) {
-	for (int i = 0; i < ast->num_statements; i++) {
+	for (int i = 0; i < ast->num_expressions; i++) {
 		indent(p);
-		print_statement(p, &ast->statements[i]);
+		print_expr(p, &ast->expressions[i]);
 		putchar('\n');
 	}
 }

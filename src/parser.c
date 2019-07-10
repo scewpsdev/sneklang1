@@ -29,6 +29,11 @@ bool next_is_op(PARSER* p, char c) {
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_OP && (c == 0 || tok.value[0] == c);
 }
 
+void skip_separator(PARSER* p) {
+	if (lexer_peek(p->input).type == TOKEN_TYPE_SEPARATOR) lexer_next(p->input);
+	else lexer_error(p->input, "SEPARATOR expected");
+}
+
 void skip_punc(PARSER* p, char c) {
 	if (next_is_punc(p, c)) lexer_next(p->input);
 	else lexer_error(p->input, "TOKEN '%c' expected", c);
@@ -40,6 +45,7 @@ void skip_op(PARSER* p, char c) {
 }
 
 EXPRESSION parse_expr(PARSER* p);
+EXPRESSION parse_call(PARSER* p, EXPRESSION func);
 
 EXPR_VEC delimited_expr(PARSER* p, char start, char end, char separator, EXPRESSION(*parser)(PARSER*)) {
 	EXPR_VEC result = evec_new(2);
@@ -56,13 +62,6 @@ EXPR_VEC delimited_expr(PARSER* p, char start, char end, char separator, EXPRESS
 	return result;
 }
 
-EXPRESSION parse_call(PARSER* p, EXPRESSION func) {
-	EXPR_VEC arglist = delimited_expr(p, '(', ')', ',', parse_expr);
-	EXPRESSION* funcptr = malloc(sizeof(EXPRESSION));
-	*funcptr = func;
-	return (EXPRESSION) { EXPR_TYPE_FUNC_CALL, .func_call = (FUNC_CALL){ funcptr, arglist.buffer, arglist.size } };
-}
-
 EXPRESSION maybe_binary(PARSER* p, EXPRESSION e, int prec) {
 	return e;
 }
@@ -73,31 +72,14 @@ EXPRESSION maybe_unary(PARSER* p, EXPRESSION e) {
 }
 
 EXPRESSION parse_bool(PARSER* p) {
-	return (EXPRESSION) { EXPR_TYPE_BOOL, .bool_literal = { strcmp(lexer_next(p->input).value, "false") } };
+	return (EXPRESSION) { EXPR_TYPE_BOOL_LITERAL, .bool_literal = { strcmp(lexer_next(p->input).value, "false") } };
 }
 
-EXPRESSION parse_atom(PARSER* p) {
-	if (next_is_keyword(p, "true") || next_is_keyword(p, "false")) return parse_bool(p);
-
-	TOKEN tok = lexer_next(p->input);
-	switch (tok.type) {
-	case TOKEN_TYPE_INT: return (EXPRESSION) { EXPR_TYPE_INT, .int_literal = { strtol(tok.value, NULL, 10) } };
-	case TOKEN_TYPE_CHAR: return (EXPRESSION) { EXPR_TYPE_CHAR, .char_literal = { tok.value[0] } };
-	case TOKEN_TYPE_FLOAT: return (EXPRESSION) { EXPR_TYPE_FLOAT, .float_literal = { strtod(tok.value, NULL) } };
-	case TOKEN_TYPE_STRING: return (EXPRESSION) { EXPR_TYPE_STRING, .string_literal = { tok.value } };
-	case TOKEN_TYPE_IDENTIFIER: return (EXPRESSION) { EXPR_TYPE_IDENTIFIER, .identifier = { tok.value } };
-	default: return (EXPRESSION) { 0 };
-	}
-}
-
-EXPRESSION parse_expr(PARSER* p) {
-	return maybe_binary(p, maybe_unary(p, parse_atom(p)), 0);
-}
-
-STATEMENT parse_expr_statement(PARSER* p) {
-	EXPRESSION e = parse_expr(p);
-	skip_punc(p, ';');
-	return (STATEMENT) { STATEMENT_TYPE_EXPR, .expr = (EXPR_STATEMENT){ e } };
+EXPRESSION parse_call(PARSER* p, EXPRESSION func) {
+	EXPR_VEC arglist = delimited_expr(p, '(', ')', ',', parse_expr);
+	EXPRESSION* funcptr = malloc(sizeof(EXPRESSION));
+	*funcptr = func;
+	return (EXPRESSION) { EXPR_TYPE_FUNC_CALL, .func_call = (FUNC_CALL){ funcptr, arglist.buffer, arglist.size } };
 }
 
 TYPE parse_type(PARSER* p) {
@@ -128,7 +110,7 @@ VAR_DECL_VEC parse_arg_list(PARSER* p) {
 	return vec;
 }
 
-STATEMENT parse_func_decl(PARSER* p) {
+EXPRESSION parse_func_decl(PARSER* p) {
 	lexer_next(p->input);
 	char* funcname = lexer_next(p->input).value;
 	skip_punc(p, '(');
@@ -136,19 +118,35 @@ STATEMENT parse_func_decl(PARSER* p) {
 	VAR_DECL* args = argvec.buffer;
 	int num_args = argvec.size;
 	skip_punc(p, ')');
-	skip_punc(p, ';');
-	return (STATEMENT) { STATEMENT_TYPE_FUNC_DECL, .func_decl = (FUNC_DECL){ funcname, args, num_args } };
+	return (EXPRESSION) { EXPR_TYPE_FUNC_DECL, .func_decl = (FUNC_DECL){ funcname, args, num_args } };
 }
 
-STATEMENT parse_statement(PARSER* p) {
+EXPRESSION parse_atom(PARSER* p) {
+	if (next_is_keyword(p, "true") || next_is_keyword(p, "false")) return parse_bool(p);
 	if (next_is_keyword(p, KEYWORD_FUNC_DECL)) return parse_func_decl(p);
-	return parse_expr_statement(p);
+
+	TOKEN tok = lexer_next(p->input);
+	switch (tok.type) {
+	case TOKEN_TYPE_INT: return (EXPRESSION) { EXPR_TYPE_INT_LITERAL, .int_literal = { strtol(tok.value, NULL, 10) } };
+	case TOKEN_TYPE_CHAR: return (EXPRESSION) { EXPR_TYPE_CHAR_LITERAL, .char_literal = { tok.value[0] } };
+	case TOKEN_TYPE_FLOAT: return (EXPRESSION) { EXPR_TYPE_FLOAT_LITERAL, .float_literal = { strtod(tok.value, NULL) } };
+	case TOKEN_TYPE_STRING: return (EXPRESSION) { EXPR_TYPE_STRING_LITERAL, .string_literal = { tok.value } };
+	case TOKEN_TYPE_IDENTIFIER: return (EXPRESSION) { EXPR_TYPE_IDENTIFIER, .identifier = { tok.value } };
+	default: return (EXPRESSION) { 0 };
+	}
+}
+
+EXPRESSION parse_expr(PARSER* p) {
+	EXPRESSION atom = parse_atom(p);
+	if (atom.type == TOKEN_TYPE_NULL) return parse_expr(p);
+	else return maybe_binary(p, maybe_unary(p, atom), 0);
 }
 
 AST parse_ast(PARSER* p) {
-	STATEMENT_VEC statements = stvec_new(10);
+	EXPR_VEC expressions = evec_new(10);
 	while (!lexer_eof(p->input)) {
-		stvec_push(&statements, parse_statement(p));
+		evec_push(&expressions, parse_expr(p));
+		if (!lexer_eof(p->input)) skip_separator(p);
 	}
-	return (AST) { statements.buffer, statements.size };
+	return (AST) { expressions.buffer, expressions.size };
 }

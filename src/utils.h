@@ -1,5 +1,7 @@
 #pragma once
 
+#include <llvm-c/Core.h>
+
 #include "ast.h"
 
 #define DECL_DYNAMIC_VECTOR(element, name, prefix) \
@@ -54,9 +56,11 @@ void prefix##_push(name* v, element e) {\
 }
 
 DECL_DYNAMIC_VECTOR(char, DYNAMIC_STRING, string)
-DECL_DYNAMIC_VECTOR(STATEMENT, STATEMENT_VEC, stvec)
+DECL_DYNAMIC_VECTOR(char*, STRING_VEC, strvec)
 DECL_DYNAMIC_VECTOR(VAR_DECL, VAR_DECL_VEC, vdvec)
 DECL_DYNAMIC_VECTOR(EXPRESSION, EXPR_VEC, evec)
+DECL_DYNAMIC_VECTOR(LLVMModuleRef, MODULE_VEC, mdvec)
+DECL_DYNAMIC_VECTOR(LLVMValueRef, VALUE_VEC, valvec)
 
 /*
 typedef struct DYNAMIC_STRING_t {

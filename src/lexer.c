@@ -27,7 +27,7 @@ void lexer_delete(LEXER* l) {
 }
 
 bool is_whitespace(char c) {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+	return c == ' ' || c == '\t' || c == '\r';
 }
 
 bool is_identifier(char c) {
@@ -144,7 +144,7 @@ TOKEN read_next(LEXER* l) {
 	if (input_eof(l->input)) return TOKEN_NULL;
 
 	char next = input_peek(l->input);
-	char next2 = input_peek_n(l->input, 2);
+	char next2 = input_peek_n(l->input, 1);
 
 	if (next == '/' && next2 == '/') {
 		skip_line_comment(l);
@@ -154,6 +154,12 @@ TOKEN read_next(LEXER* l) {
 		return read_next(l);
 	}
 
+	if (next == '\n' || next == ';') {
+		char* value = malloc(2);
+		value[0] = input_next(l->input);
+		value[1] = 0;
+		return (TOKEN) { TOKEN_TYPE_SEPARATOR, value };
+	}
 	if (next == '"') return read_string(l);
 	if (next == '\'') return read_char(l);
 	if (is_num(next, next2)) return read_number(l);

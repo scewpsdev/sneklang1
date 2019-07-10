@@ -7,13 +7,15 @@
 
 enum EXPR_TYPE {
 	EXPR_TYPE_NULL,
-	EXPR_TYPE_INT,
-	EXPR_TYPE_CHAR,
-	EXPR_TYPE_BOOL,
-	EXPR_TYPE_FLOAT,
-	EXPR_TYPE_STRING,
+	EXPR_TYPE_INT_LITERAL,
+	EXPR_TYPE_CHAR_LITERAL,
+	EXPR_TYPE_BOOL_LITERAL,
+	EXPR_TYPE_FLOAT_LITERAL,
+	EXPR_TYPE_STRING_LITERAL,
 	EXPR_TYPE_IDENTIFIER,
-	EXPR_TYPE_FUNC_CALL
+	EXPR_TYPE_FUNC_CALL,
+
+	EXPR_TYPE_FUNC_DECL
 };
 
 typedef struct EXPRESSION_t EXPRESSION;
@@ -71,30 +73,6 @@ typedef struct UNARY_OP_t {
 	EXPRESSION* expr;
 } UNARY_OP;
 
-typedef struct EXPRESSION_t {
-	uint8_t type;
-	union {
-		INT int_literal;
-		CHAR char_literal;
-		BOOL bool_literal;
-		FLOAT float_literal;
-		STRING string_literal;
-		IDENTIFIER identifier;
-		FUNC_CALL func_call;
-	};
-} EXPRESSION;
-
-
-enum STATEMENT_TYPE {
-	STATEMENT_TYPE_NULL,
-	STATEMENT_TYPE_EXPR,
-	STATEMENT_TYPE_FUNC_DECL
-};
-
-typedef struct EXPR_STATEMENT_t {
-	EXPRESSION expr;
-} EXPR_STATEMENT;
-
 typedef struct VAR_DECL_t {
 	TYPE type;
 	char* name;
@@ -106,15 +84,21 @@ typedef struct FUNC_DECL_t {
 	uint8_t num_args;
 } FUNC_DECL;
 
-typedef struct STATEMENT_t {
+typedef struct EXPRESSION_t {
 	uint8_t type;
 	union {
-		EXPR_STATEMENT expr;
+		INT int_literal;
+		CHAR char_literal;
+		BOOL bool_literal;
+		FLOAT float_literal;
+		STRING string_literal;
+		IDENTIFIER identifier;
+		FUNC_CALL func_call;
 		FUNC_DECL func_decl;
 	};
-} STATEMENT;
+} EXPRESSION;
 
 typedef struct AST_t {
-	STATEMENT* statements;
-	uint64_t num_statements;
+	EXPRESSION* expressions;
+	uint64_t num_expressions;
 } AST;
