@@ -5,6 +5,22 @@
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/Linker.h>
 
+SCOPE* scope_new(SCOPE* parent) {
+	SCOPE* scope = malloc(sizeof(SCOPE));
+	*scope = (SCOPE){ parent };
+
+	scope->locals_k = strvec_new(8);
+	scope->locals_v = valvec_new(8);
+
+	return scope;
+}
+
+void scope_delete(SCOPE* scope) {
+	strvec_delete(&scope->locals_k);
+	valvec_delete(&scope->locals_v);
+	free(scope);
+}
+
 CODEGEN gen_new() {
 	CODEGEN g;
 
@@ -13,8 +29,9 @@ CODEGEN gen_new() {
 	g.module_vec = mdvec_new(2);
 
 	g.ast = NULL;
-	g.llvm_module = NULL;
 	g.current_scope = NULL;
+	g.llvm_module = NULL;
+	g.llvm_func = NULL;
 
 	g.globals_k = strvec_new(8);
 	g.globals_v = valvec_new(8);
@@ -32,6 +49,9 @@ void gen_delete(CODEGEN* codegen) {
 }
 
 LLVMValueRef find_local_value(SCOPE* s, char* name) {
+	for (int i = 0; i < s->locals_k.size; i++) {
+		if (strcmp(s->locals_k.buffer[i], name) == 0) return s->locals_v.buffer[i];
+	}
 	return NULL;
 }
 
@@ -51,13 +71,17 @@ LLVMValueRef find_named_value(CODEGEN* g, SCOPE* s, char* name) {
 	return NULL;
 }
 
-LLVMTypeRef get_llvm_type(TYPE* type) {
+LLVMTypeRef get_llvm_type_from_str(char* name, bool cpy) {
 	LLVMTypeRef val_type = NULL;
-	if (strlen(type->name) >= 2 && type->name[0] == 'i') {
-		int bitsize = strtol(type->name + 1, NULL, 10);
+	if (strlen(name) >= 2 && name[0] == 'i') {
+		int bitsize = strtol(name + 1, NULL, 10);
 		val_type = LLVMIntType(bitsize);
 	}
-	return type->cpy ? val_type : LLVMPointerType(val_type, 0);
+	return cpy ? val_type : LLVMPointerType(val_type, 0);
+}
+
+LLVMTypeRef get_llvm_type(TYPE* type) {
+	return get_llvm_type_from_str(type->name, type->cpy);
 }
 
 LLVMValueRef cast_value(CODEGEN* g, LLVMValueRef val, LLVMTypeRef type) {
@@ -71,18 +95,48 @@ LLVMValueRef cast_value(CODEGEN* g, LLVMValueRef val, LLVMTypeRef type) {
 	return NULL;
 }
 
+LLVMValueRef alloc_value(CODEGEN* g, const char* name, LLVMTypeRef type, SCOPE* scope) {
+	LLVMBasicBlockRef entry_block = LLVMGetEntryBasicBlock(g->llvm_func);
+	LLVMBuilderRef new_builder = LLVMCreateBuilderInContext(g->llvm_context);
+	LLVMValueRef first_inst = NULL;
+	if (first_inst = LLVMGetFirstInstruction(entry_block)) {
+		LLVMPositionBuilderBefore(new_builder, first_inst);
+	} else {
+		LLVMPositionBuilderAtEnd(new_builder, entry_block);
+	}
+	LLVMValueRef ptr = LLVMBuildAlloca(new_builder, type, name);
+	strvec_push(&scope->locals_k, name);
+	valvec_push(&scope->locals_v, ptr);
+
+	return ptr;
+}
+
 LLVMValueRef gen_expr(CODEGEN*, EXPRESSION*);
 
 LLVMValueRef gen_int_literal(CODEGEN* g, INT* i) {
 	LLVMValueRef value = LLVMConstInt(LLVMInt64Type(), i->value, true);
-	LLVMValueRef ptr = LLVMBuildAlloca(g->llvm_builder, LLVMTypeOf(value), "");
+	LLVMValueRef ptr = alloc_value(g, "", LLVMTypeOf(value), g->current_scope);
 	LLVMBuildStore(g->llvm_builder, value, ptr);
 	return ptr;
 }
 
 LLVMValueRef gen_char_literal(CODEGEN* g, CHAR* ch) {
 	LLVMValueRef value = LLVMConstInt(LLVMInt8Type(), ch->value, false);
-	LLVMValueRef ptr = LLVMBuildAlloca(g->llvm_builder, LLVMTypeOf(value), "");
+	LLVMValueRef ptr = alloc_value(g, "", LLVMTypeOf(value), g->current_scope);
+	LLVMBuildStore(g->llvm_builder, value, ptr);
+	return ptr;
+}
+
+LLVMValueRef gen_bool_literal(CODEGEN* g, BOOL* b) {
+	LLVMValueRef value = LLVMConstInt(LLVMInt1Type(), b->value, false);
+	LLVMValueRef ptr = alloc_value(g, "", LLVMTypeOf(value), g->current_scope);
+	LLVMBuildStore(g->llvm_builder, value, ptr);
+	return ptr;
+}
+
+LLVMValueRef gen_float_literal(CODEGEN* g, FLOAT* f) {
+	LLVMValueRef value = LLVMConstReal(LLVMDoubleType(), f->value);
+	LLVMValueRef ptr = alloc_value(g, "", LLVMTypeOf(value), g->current_scope);
 	LLVMBuildStore(g->llvm_builder, value, ptr);
 	return ptr;
 }
@@ -96,6 +150,16 @@ LLVMValueRef gen_identifier(CODEGEN* g, IDENTIFIER* i) {
 }
 
 LLVMValueRef gen_func_call(CODEGEN* g, FUNC_CALL* func_call) {
+	// Cast
+	if (func_call->callee->type = EXPR_TYPE_IDENTIFIER && func_call->num_args == 1) {
+		LLVMTypeRef llvm_type = NULL;
+		if (llvm_type = get_llvm_type_from_str(func_call->callee->identifier.name, false)) {
+			LLVMValueRef value = cast_value(g, LLVMBuildLoad(g->llvm_builder, gen_expr(g, &func_call->args[0]), ""), llvm_type);
+			LLVMValueRef ptr = alloc_value(g, "", LLVMTypeOf(value), g->current_scope);
+			return ptr;
+		}
+	}
+
 	LLVMValueRef callee = gen_expr(g, func_call->callee);
 
 	LLVMValueRef* args = malloc(func_call->num_args * sizeof(LLVMValueRef));
@@ -123,6 +187,53 @@ LLVMValueRef gen_func_call(CODEGEN* g, FUNC_CALL* func_call) {
 	return ret_val;
 }
 
+LLVMValueRef gen_assign(CODEGEN* g, ASSIGN* assign) {
+	LLVMValueRef left = gen_expr(g, assign->left);
+	LLVMValueRef right = gen_expr(g, assign->right);
+	if (strcmp(assign->op, "=") == 0 && !left) {
+		if (assign->left->type != EXPR_TYPE_IDENTIFIER) {
+			// TODO ERROR
+		}
+		left = alloc_value(g, assign->left->identifier.name, LLVMGetElementType(LLVMTypeOf(right)), g->current_scope);
+	}
+
+	LLVMBuildStore(g->llvm_builder, cast_value(g, LLVMBuildLoad(g->llvm_builder, right, ""), LLVMGetElementType(LLVMTypeOf(left))), left);
+
+	return right;
+}
+
+LLVMValueRef create_binary_op(CODEGEN* g, const char* op, LLVMValueRef left, LLVMValueRef right) {
+	LLVMTypeRef ltype = LLVMTypeOf(left);
+	LLVMTypeRef rtype = LLVMTypeOf(right);
+	if (LLVMGetTypeKind(ltype) == LLVMIntegerTypeKind && LLVMGetTypeKind(rtype) == LLVMIntegerTypeKind) {
+		LLVMTypeRef type = LLVMIntType(max(LLVMGetIntTypeWidth(ltype), LLVMGetIntTypeWidth(rtype)));
+		left = cast_value(g, left, type);
+		right = cast_value(g, right, type);
+		if (strcmp(op, "+") == 0) return LLVMBuildAdd(g->llvm_builder, left, right, "");
+		if (strcmp(op, "-") == 0) return LLVMBuildSub(g->llvm_builder, left, right, "");
+		if (strcmp(op, "*") == 0) return LLVMBuildMul(g->llvm_builder, left, right, "");
+		if (strcmp(op, "/") == 0) return LLVMBuildSDiv(g->llvm_builder, left, right, "");
+		if (strcmp(op, "%") == 0) return LLVMBuildSRem(g->llvm_builder, left, right, "");
+		if (strcmp(op, "==") == 0) return LLVMBuildICmp(g->llvm_builder, LLVMIntEQ, left, right, "");
+		if (strcmp(op, "!=") == 0) return LLVMBuildICmp(g->llvm_builder, LLVMIntNE, left, right, "");
+		if (strcmp(op, "<") == 0) return LLVMBuildICmp(g->llvm_builder, LLVMIntSLT, left, right, "");
+		if (strcmp(op, ">") == 0) return LLVMBuildICmp(g->llvm_builder, LLVMIntSGT, left, right, "");
+		if (strcmp(op, "<=") == 0) return LLVMBuildICmp(g->llvm_builder, LLVMIntSLE, left, right, "");
+		if (strcmp(op, ">=") == 0) return LLVMBuildICmp(g->llvm_builder, LLVMIntSGE, left, right, "");
+		if (strcmp(op, "&&") == 0) return LLVMBuildAnd(g->llvm_builder, left, right, "");
+		if (strcmp(op, "||") == 0) return LLVMBuildOr(g->llvm_builder, left, right, "");
+	}
+	return NULL;
+}
+
+LLVMValueRef gen_binary_op(CODEGEN* g, BINARY_OP* binary_op) {
+	LLVMValueRef value = create_binary_op(g, binary_op->op, LLVMBuildLoad(g->llvm_builder, gen_expr(g, binary_op->left), ""), LLVMBuildLoad(g->llvm_builder, gen_expr(g, binary_op->right), ""));
+	LLVMValueRef ptr = alloc_value(g, "", LLVMTypeOf(value), g->current_scope);
+	LLVMBuildStore(g->llvm_builder, value, ptr);
+
+	return ptr;
+}
+
 LLVMValueRef gen_unary_op(CODEGEN* g, UNARY_OP* unary_op) {
 	LLVMValueRef expr = gen_expr(g, unary_op->expr);
 
@@ -147,9 +258,13 @@ LLVMValueRef gen_expr(CODEGEN* g, EXPRESSION* expr) {
 	switch (expr->type) {
 	case EXPR_TYPE_INT_LITERAL: return gen_int_literal(g, &expr->int_literal);
 	case EXPR_TYPE_CHAR_LITERAL: return gen_char_literal(g, &expr->char_literal);
+	case EXPR_TYPE_BOOL_LITERAL: return gen_bool_literal(g, &expr->bool_literal);
+	case EXPR_TYPE_FLOAT_LITERAL: return gen_float_literal(g, &expr->float_literal);
 	case EXPR_TYPE_STRING_LITERAL: return gen_string_literal(g, &expr->string_literal);
 	case EXPR_TYPE_IDENTIFIER: return gen_identifier(g, &expr->identifier);
 	case EXPR_TYPE_FUNC_CALL: return gen_func_call(g, &expr->func_call);
+	case EXPR_TYPE_ASSIGN: return gen_assign(g, &expr->assign);
+	case EXPR_TYPE_BINARY_OP: return gen_binary_op(g, &expr->binary_op);
 	case EXPR_TYPE_UNARY_OP: return gen_unary_op(g, &expr->unary_op);
 	case EXPR_TYPE_FUNC_DECL: return gen_func_decl(g, &expr->func_decl);
 	default: return LLVMConstInt(LLVMInt32Type(), 0, true);
@@ -158,14 +273,13 @@ LLVMValueRef gen_expr(CODEGEN* g, EXPRESSION* expr) {
 
 LLVMValueRef gen_ast(CODEGEN* g, AST* ast) {
 	SCOPE* parent = g->current_scope;
-	g->current_scope = malloc(sizeof(SCOPE));
-	*g->current_scope = (SCOPE){ parent };
+	g->current_scope = scope_new(parent);
 
 	for (int i = 0; i < ast->num_expressions; i++) {
 		gen_expr(g, &ast->expressions[i]);
 	}
 
-	free(g->current_scope);
+	scope_delete(g->current_scope);
 	g->current_scope = parent;
 
 	return LLVMConstInt(LLVMInt32Type(), 0, true);
@@ -175,6 +289,7 @@ void gen_toplevel(CODEGEN* g, AST* ast) {
 	LLVMTypeRef func_type = LLVMFunctionType(LLVMInt32Type(), NULL, 0, false);
 	LLVMValueRef function = LLVMAddFunction(g->llvm_module, "__main_init", func_type);
 	LLVMSetLinkage(function, LLVMExternalLinkage);
+	g->llvm_func = function;
 
 	LLVMBasicBlockRef entry_block = LLVMAppendBasicBlock(function, "entry");
 	LLVMPositionBuilderAtEnd(g->llvm_builder, entry_block);
@@ -182,6 +297,7 @@ void gen_toplevel(CODEGEN* g, AST* ast) {
 	gen_ast(g, ast);
 
 	LLVMBuildRet(g->llvm_builder, LLVMConstInt(LLVMInt32Type(), 0, true));
+	g->llvm_func = NULL;
 }
 
 void gen_create_module(CODEGEN* g, AST* ast) {

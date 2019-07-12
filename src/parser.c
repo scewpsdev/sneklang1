@@ -5,6 +5,10 @@
 #include "utils.h"
 #include "keywords.h"
 
+const char* OP_MAP_K[] = { "=", "+=", "-=", "*=", "/=", "%=", "||", "&&", "<", ">", "<=", ">=", "==", "!=", "+", "-", "*", "/", "%" };
+const int OP_MAP_V[] = { 1, 1, 1, 1, 1, 1, 2, 3, 7, 7, 7, 7, 7, 7, 10, 10, 20, 20, 20 };
+const int NUM_OPS = 19;
+
 PARSER parser_new(LEXER* lexer) {
 	PARSER p;
 	p.input = lexer;
@@ -24,9 +28,9 @@ bool next_is_punc(PARSER* p, char c) {
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_PUNC && (c == 0 || tok.value[0] == c);
 }
 
-bool next_is_op(PARSER* p, char c) {
+bool next_is_op(PARSER* p, char* c) {
 	TOKEN tok = lexer_peek(p->input);
-	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_OP && (c == 0 || tok.value[0] == c);
+	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_OP && (c[0] == 0 || strcmp(tok.value, c) == 0);
 }
 
 void skip_separator(PARSER* p) {
@@ -39,12 +43,20 @@ void skip_punc(PARSER* p, char c) {
 	else lexer_error(p->input, "TOKEN '%c' expected", c);
 }
 
-void skip_op(PARSER* p, char c) {
-	if (next_is_op(p, c)) lexer_next(p->input);
-	else lexer_error(p->input, "TOKEN '%c' expected", c);
+void skip_op(PARSER* p, char* op) {
+	if (next_is_op(p, op)) lexer_next(p->input);
+	else lexer_error(p->input, "TOKEN '%s' expected", op);
+}
+
+int get_op_precedence(char* op) {
+	for (int i = 0; i < NUM_OPS; i++) {
+		if (strcmp(OP_MAP_K[i], op) == 0) return OP_MAP_V[i];
+	}
+	return -1;
 }
 
 EXPRESSION parse_expr(PARSER* p);
+EXPRESSION parse_atom(PARSER* p);
 EXPRESSION parse_call(PARSER* p, EXPRESSION func);
 
 EXPR_VEC delimited_expr(PARSER* p, char start, char end, char separator, EXPRESSION(*parser)(PARSER*)) {
@@ -62,12 +74,29 @@ EXPR_VEC delimited_expr(PARSER* p, char start, char end, char separator, EXPRESS
 	return result;
 }
 
-EXPRESSION maybe_binary(PARSER* p, EXPRESSION e, int prec) {
+EXPRESSION maybe_unary(PARSER* p, EXPRESSION e) {
+	if (next_is_punc(p, '(')) return maybe_unary(p, parse_call(p, e));
 	return e;
 }
 
-EXPRESSION maybe_unary(PARSER* p, EXPRESSION e) {
-	if (next_is_punc(p, '(')) return maybe_unary(p, parse_call(p, e));
+EXPRESSION maybe_binary(PARSER* p, EXPRESSION e, int prec) {
+	if (next_is_op(p, "")) {
+		TOKEN token = lexer_peek(p->input);
+		int token_prec = get_op_precedence(token.value);
+		if (token_prec > prec) {
+			lexer_next(p->input);
+			EXPRESSION* left = malloc(sizeof(EXPRESSION));
+			EXPRESSION* right = malloc(sizeof(EXPRESSION));
+			*left = e;
+			*right = maybe_binary(p, maybe_unary(p, parse_atom(p)), token_prec);
+			if (strcmp(token.value, "=") == 0
+				|| strlen(token.value) == 2 && (token.value[0] == '+' || token.value[0] == '-' || token.value[0] == '*' || token.value[0] == '/' || token.value[0] == '%') && token.value[1] == '=') {
+				return maybe_unary(p, maybe_binary(p, (EXPRESSION) { EXPR_TYPE_ASSIGN, .assign = { token.value, left, right } }, prec));
+			} else {
+				return maybe_unary(p, maybe_binary(p, (EXPRESSION) { EXPR_TYPE_BINARY_OP, .binary_op = (BINARY_OP){ token.value, left, right } }, prec));
+			}
+		}
+	}
 	return e;
 }
 
@@ -85,9 +114,9 @@ EXPRESSION parse_call(PARSER* p, EXPRESSION func) {
 TYPE parse_type(PARSER* p) {
 	char* name = NULL;
 	bool cpy = false;
-	if (next_is_op(p, '*')) {
+	if (next_is_op(p, "*")) {
 		cpy = true;
-		skip_op(p, '*');
+		skip_op(p, "*");
 	}
 	name = lexer_next(p->input).value;
 
@@ -124,8 +153,10 @@ EXPRESSION parse_func_decl(PARSER* p) {
 }
 
 EXPRESSION parse_atom(PARSER* p) {
+	while (lexer_peek(p->input).type == TOKEN_TYPE_SEPARATOR) lexer_next(p->input);
+
 	if (next_is_keyword(p, "true") || next_is_keyword(p, "false")) return parse_bool(p);
-	if (next_is_op(p, '*')) {
+	if (next_is_op(p, "*")) {
 		char* op = lexer_next(p->input).value;
 		EXPRESSION* expr = malloc(sizeof(EXPRESSION));
 		*expr = maybe_unary(p, parse_atom(p));

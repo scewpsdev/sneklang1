@@ -1,3 +1,16 @@
+// This is a line comment
+/* This is a block comment */
+
 decl putchar(*i32 Char)
 
-putchar('a')
+b = 5
+c = 'c'
+d = true
+e = 1.5
+f2i = i64(e)
+
+var = 99 + d
+putchar(99)
+putchar(var)
+
+putchar(10)

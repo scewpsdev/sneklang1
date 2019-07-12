@@ -53,6 +53,24 @@ void print_func_call(AST_PRINTER* p, FUNC_CALL* func_call) {
 	putchar(')');
 }
 
+void print_assign(AST_PRINTER* p, ASSIGN* assign) {
+	print_expr(p, assign->left);
+	printf(" %s ", assign->op);
+	print_expr(p, assign->right);
+}
+
+void print_binary_op(AST_PRINTER* p, BINARY_OP* binary) {
+	print_expr(p, binary->left);
+	printf(" %s ", binary->op);
+	print_expr(p, binary->right);
+}
+
+void print_unary_op(AST_PRINTER* p, UNARY_OP* unary) {
+	if (!unary->position) printf(unary->op);
+	print_expr(p, unary->expr);
+	if (unary->position) printf(unary->op);
+}
+
 void print_type(TYPE t) {
 	if (t.cpy) putchar('*');
 	printf(t.name);
@@ -69,7 +87,7 @@ void print_arg_list(AST_PRINTER* p, VAR_DECL* args, int num_args) {
 void print_func_decl(AST_PRINTER* p, FUNC_DECL* func_decl) {
 	printf("decl %s(", func_decl->funcname);
 	print_arg_list(p, func_decl->args, func_decl->num_args);
-	printf(");");
+	putchar(')');
 }
 
 void print_expr(AST_PRINTER* p, EXPRESSION* expr) {
@@ -81,6 +99,9 @@ void print_expr(AST_PRINTER* p, EXPRESSION* expr) {
 	case EXPR_TYPE_STRING_LITERAL: print_string_literal(p, &expr->string_literal); break;
 	case EXPR_TYPE_IDENTIFIER: print_identifier(p, &expr->identifier); break;
 	case EXPR_TYPE_FUNC_CALL: print_func_call(p, &expr->func_call); break;
+	case EXPR_TYPE_ASSIGN: print_assign(p, &expr->assign); break;
+	case EXPR_TYPE_BINARY_OP: print_binary_op(p, &expr->binary_op); break;
+	case EXPR_TYPE_UNARY_OP: print_unary_op(p, &expr->unary_op); break;
 	case EXPR_TYPE_FUNC_DECL: print_func_decl(p, &expr->func_decl); break;
 	default: break;
 	}

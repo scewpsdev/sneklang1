@@ -12,6 +12,8 @@
 
 typedef struct SCOPE_t {
 	struct SCOPE_t* parent;
+	STRING_VEC locals_k;
+	VALUE_VEC locals_v;
 } SCOPE;
 
 typedef struct CODEGEN_t {
@@ -20,8 +22,9 @@ typedef struct CODEGEN_t {
 	MODULE_VEC module_vec;
 
 	AST* ast;
-	LLVMModuleRef llvm_module;
 	SCOPE* current_scope;
+	LLVMModuleRef llvm_module;
+	LLVMValueRef llvm_func;
 
 	STRING_VEC globals_k;
 	VALUE_VEC globals_v;
