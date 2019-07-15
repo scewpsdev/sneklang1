@@ -11,6 +11,13 @@ const char* KEYWORDS[] = {
 	KEYWORD_TRUE,
 	KEYWORD_FALSE,
 	KEYWORD_FUNC_DECL,
+	KEYWORD_RETURN,
+	KEYWORD_IF,
+	KEYWORD_ELSE,
+	KEYWORD_LOOP,
+	KEYWORD_WHILE,
+	KEYWORD_BREAK,
+	KEYWORD_CONTINUE,
 	""
 };
 
@@ -97,9 +104,16 @@ char* read_escaped(LEXER* l, char end) {
 	while (!input_eof(l->input)) {
 		char c = input_next(l->input);
 		if (esc) {
-			// TODO
-			string_push(&result, c);
 			esc = false;
+			char escaped = 0;
+			switch (c) {
+			case 'n': escaped = '\n'; break;
+			case 't': escaped = '\t'; break;
+			case 'r': escaped = '\r'; break;
+			case '0': escaped = '\0'; break;
+			default: lexer_error(l, "Unknown escape character \\%c", c); continue;
+			}
+			string_push(&result, escaped);
 		} else if (c == '\\') esc = true;
 		else if (c == end) break;
 		else string_push(&result, c);

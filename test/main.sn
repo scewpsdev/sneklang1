@@ -2,15 +2,43 @@
 /* This is a block comment */
 
 decl putchar(*i32 Char)
+decl printf(i8 format)
 
-b = 5
+/*
+b = 102
 c = 'c'
 d = true
-e = 1.5
-f2i = i64(e)
+e = 99.5
+f = "hello world\n"
 
-var = 99 + d
-putchar(99)
+printf(f)
+putchar(c)
+putchar(i64(e))
+putchar(99 + d)
+putchar('\n')
+
+var = if c == 'd' {
+	putchar('_')
+	'Y'
+} else {
+	putchar('&')
+	'N'
+}
 putchar(var)
 
-putchar(10)
+i = 0
+while i < 5 {
+	putchar('W')
+	i = i + 1
+}
+*/
+
+i = 0
+loop {
+	if i >= 5 break
+	else continue
+	putchar('V')
+	i = i + 1
+}
+
+putchar('\n')

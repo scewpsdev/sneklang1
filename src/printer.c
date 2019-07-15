@@ -9,10 +9,11 @@ AST_PRINTER printer_new() {
 void printer_delete(AST_PRINTER* printer) {
 }
 
+void print_ast(AST_PRINTER* p, AST* ast);
 void print_expr(AST_PRINTER* p, EXPRESSION* expr);
 
 void indent(AST_PRINTER* p) {
-	for (int i = 0; i < p->indentation; i++) putchar(' ');
+	for (int i = 0; i < p->indentation * 2; i++) putchar(' ');
 }
 
 void print_int_literal(AST_PRINTER* p, INT* i) {
@@ -71,6 +72,43 @@ void print_unary_op(AST_PRINTER* p, UNARY_OP* unary) {
 	if (unary->position) printf(unary->op);
 }
 
+void print_compound(AST_PRINTER* p, COMPOUND* compound) {
+	printf("{\n");
+	p->indentation++;
+	print_ast(p, compound->ast);
+	p->indentation--;
+	indent(p);
+	putchar('}');
+}
+
+void print_if_statement(AST_PRINTER* p, IF* if_statement) {
+	printf("if ");
+	print_expr(p, if_statement->condition);
+	putchar(' ');
+	print_expr(p, if_statement->then_block);
+	if (if_statement->else_block) {
+		printf(" else ");
+		print_expr(p, if_statement->else_block);
+	}
+}
+
+void print_loop(AST_PRINTER* p, LOOP* loop) {
+	printf("loop ");
+	if (loop->condition) {
+		print_expr(p, loop->condition);
+		putchar(' ');
+	}
+	print_expr(p, loop->body);
+}
+
+void print_break(AST_PRINTER* p, BREAK* break_statement) {
+	printf("break");
+}
+
+void print_continue(AST_PRINTER* p, CONTINUE* continue_statement) {
+	printf("continue");
+}
+
 void print_type(TYPE t) {
 	if (t.cpy) putchar('*');
 	printf(t.name);
@@ -102,6 +140,11 @@ void print_expr(AST_PRINTER* p, EXPRESSION* expr) {
 	case EXPR_TYPE_ASSIGN: print_assign(p, &expr->assign); break;
 	case EXPR_TYPE_BINARY_OP: print_binary_op(p, &expr->binary_op); break;
 	case EXPR_TYPE_UNARY_OP: print_unary_op(p, &expr->unary_op); break;
+	case EXPR_TYPE_COMPOUND: print_compound(p, &expr->compound); break;
+	case EXPR_TYPE_IF_STATEMENT: print_if_statement(p, &expr->if_statement); break;
+	case EXPR_TYPE_LOOP: print_loop(p, &expr->loop); break;
+	case EXPR_TYPE_BREAK: print_break(p, &expr->break_statement); break;
+	case EXPR_TYPE_CONTINUE: print_continue(p, &expr->continue_statement); break;
 	case EXPR_TYPE_FUNC_DECL: print_func_decl(p, &expr->func_decl); break;
 	default: break;
 	}

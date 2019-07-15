@@ -9,6 +9,9 @@ SCOPE* scope_new(SCOPE* parent) {
 	SCOPE* scope = malloc(sizeof(SCOPE));
 	*scope = (SCOPE){ parent };
 
+	scope->break_dest = NULL;
+	scope->continue_dest = NULL;
+
 	scope->locals_k = strvec_new(8);
 	scope->locals_v = valvec_new(8);
 
@@ -77,6 +80,7 @@ LLVMTypeRef get_llvm_type_from_str(char* name, bool cpy) {
 		int bitsize = strtol(name + 1, NULL, 10);
 		val_type = LLVMIntType(bitsize);
 	}
+	if (!val_type) return NULL;
 	return cpy ? val_type : LLVMPointerType(val_type, 0);
 }
 
@@ -87,15 +91,26 @@ LLVMTypeRef get_llvm_type(TYPE* type) {
 LLVMValueRef cast_value(CODEGEN* g, LLVMValueRef val, LLVMTypeRef type) {
 	LLVMTypeRef val_type = LLVMTypeOf(val);
 	if (LLVMTypeOf(val) == type) return val;
+	// Int-int cast
 	if (LLVMGetTypeKind(val_type) == LLVMIntegerTypeKind && LLVMGetTypeKind(type) == LLVMIntegerTypeKind) {
 		return LLVMGetIntTypeWidth(val_type) > LLVMGetIntTypeWidth(type)
 			? LLVMBuildTrunc(g->llvm_builder, val, type, "")
 			: LLVMBuildSExt(g->llvm_builder, val, type, "");
 	}
+	// Float-int cast
+	if ((LLVMGetTypeKind(val_type) == LLVMFloatTypeKind || LLVMGetTypeKind(val_type) == LLVMDoubleTypeKind)
+		&& LLVMGetTypeKind(type) == LLVMIntegerTypeKind) {
+		return LLVMBuildFPToSI(g->llvm_builder, val, type, "");
+	}
+	// Int-float cast
+	if (LLVMGetTypeKind(val_type) == LLVMIntegerTypeKind
+		&& (LLVMGetTypeKind(val_type) == LLVMFloatTypeKind || LLVMGetTypeKind(val_type) == LLVMDoubleTypeKind)) {
+		return LLVMBuildSIToFP(g->llvm_builder, val, type, "");
+	}
 	return NULL;
 }
 
-LLVMValueRef alloc_value(CODEGEN* g, const char* name, LLVMTypeRef type, SCOPE* scope) {
+LLVMValueRef alloc_value(CODEGEN* g, char* name, LLVMTypeRef type, SCOPE* scope) {
 	LLVMBasicBlockRef entry_block = LLVMGetEntryBasicBlock(g->llvm_func);
 	LLVMBuilderRef new_builder = LLVMCreateBuilderInContext(g->llvm_context);
 	LLVMValueRef first_inst = NULL;
@@ -105,13 +120,12 @@ LLVMValueRef alloc_value(CODEGEN* g, const char* name, LLVMTypeRef type, SCOPE* 
 		LLVMPositionBuilderAtEnd(new_builder, entry_block);
 	}
 	LLVMValueRef ptr = LLVMBuildAlloca(new_builder, type, name);
-	strvec_push(&scope->locals_k, name);
-	valvec_push(&scope->locals_v, ptr);
 
 	return ptr;
 }
 
 LLVMValueRef gen_expr(CODEGEN*, EXPRESSION*);
+LLVMValueRef gen_ast(CODEGEN*, AST*);
 
 LLVMValueRef gen_int_literal(CODEGEN* g, INT* i) {
 	LLVMValueRef value = LLVMConstInt(LLVMInt64Type(), i->value, true);
@@ -142,49 +156,14 @@ LLVMValueRef gen_float_literal(CODEGEN* g, FLOAT* f) {
 }
 
 LLVMValueRef gen_string_literal(CODEGEN* g, STRING* str) {
-	return NULL;
+	LLVMValueRef value = LLVMConstString(str->value, (unsigned int)strlen(str->value), false);
+	LLVMValueRef ptr = alloc_value(g, "", LLVMArrayType(LLVMInt8Type(), (unsigned int)strlen(str->value) + 1), g->current_scope);
+	LLVMBuildStore(g->llvm_builder, value, ptr);
+	return LLVMBuildBitCast(g->llvm_builder, ptr, LLVMPointerType(LLVMInt8Type(), 0), "");
 }
 
 LLVMValueRef gen_identifier(CODEGEN* g, IDENTIFIER* i) {
 	return find_named_value(g, g->current_scope, i->name);
-}
-
-LLVMValueRef gen_func_call(CODEGEN* g, FUNC_CALL* func_call) {
-	// Cast
-	if (func_call->callee->type = EXPR_TYPE_IDENTIFIER && func_call->num_args == 1) {
-		LLVMTypeRef llvm_type = NULL;
-		if (llvm_type = get_llvm_type_from_str(func_call->callee->identifier.name, false)) {
-			LLVMValueRef value = cast_value(g, LLVMBuildLoad(g->llvm_builder, gen_expr(g, &func_call->args[0]), ""), llvm_type);
-			LLVMValueRef ptr = alloc_value(g, "", LLVMTypeOf(value), g->current_scope);
-			return ptr;
-		}
-	}
-
-	LLVMValueRef callee = gen_expr(g, func_call->callee);
-
-	LLVMValueRef* args = malloc(func_call->num_args * sizeof(LLVMValueRef));
-	LLVMTypeRef* arg_types = malloc(LLVMCountParams(callee) * sizeof(LLVMTypeRef));
-	for (int i = 0; i < func_call->num_args; i++) {
-		LLVMValueRef arg = gen_expr(g, &func_call->args[i]);
-		LLVMTypeRef arg_type = LLVMTypeOf(arg);
-		LLVMTypeRef param_type = LLVMTypeOf(LLVMGetParam(callee, i));
-		if (LLVMGetTypeKind(arg_type) == LLVMGetTypeKind(param_type)) {
-			if (LLVMGetTypeKind(arg_type) == LLVMPointerTypeKind) args[i] = arg;
-			else args[i] = cast_value(g, arg, param_type);
-		} else {
-			if (LLVMGetTypeKind(arg_type) == LLVMPointerTypeKind) {
-				LLVMValueRef value = LLVMBuildLoad(g->llvm_builder, arg, "");
-				args[i] = cast_value(g, value, param_type);
-			} else if (LLVMGetTypeKind(param_type) == LLVMPointerTypeKind) {
-				LLVMValueRef ptr = LLVMBuildAlloca(g->llvm_builder, LLVMGetElementType(param_type), "");
-				LLVMBuildStore(g->llvm_builder, cast_value(g, arg, LLVMGetElementType(param_type)), ptr);
-				args[i] = ptr;
-			}
-		}
-	}
-	LLVMValueRef ret_val = LLVMBuildCall(g->llvm_builder, callee, args, func_call->num_args, "");
-	free(args);
-	return ret_val;
 }
 
 LLVMValueRef gen_assign(CODEGEN* g, ASSIGN* assign) {
@@ -194,10 +173,11 @@ LLVMValueRef gen_assign(CODEGEN* g, ASSIGN* assign) {
 		if (assign->left->type != EXPR_TYPE_IDENTIFIER) {
 			// TODO ERROR
 		}
-		left = alloc_value(g, assign->left->identifier.name, LLVMGetElementType(LLVMTypeOf(right)), g->current_scope);
+		strvec_push(&g->current_scope->locals_k, assign->left->identifier.name);
+		valvec_push(&g->current_scope->locals_v, right);
+	} else {
+		LLVMBuildStore(g->llvm_builder, cast_value(g, LLVMBuildLoad(g->llvm_builder, right, ""), LLVMGetElementType(LLVMTypeOf(left))), left);
 	}
-
-	LLVMBuildStore(g->llvm_builder, cast_value(g, LLVMBuildLoad(g->llvm_builder, right, ""), LLVMGetElementType(LLVMTypeOf(left))), left);
 
 	return right;
 }
@@ -242,6 +222,155 @@ LLVMValueRef gen_unary_op(CODEGEN* g, UNARY_OP* unary_op) {
 	return NULL;
 }
 
+LLVMValueRef gen_compound(CODEGEN* g, COMPOUND* compound) {
+	return gen_ast(g, compound->ast);
+}
+
+LLVMValueRef gen_return(CODEGEN* g, RETURN* ret_statement) {
+	return NULL;
+}
+
+LLVMValueRef gen_if_statement(CODEGEN* g, IF* if_statement) {
+	LLVMValueRef condition = cast_value(g, LLVMBuildLoad(g->llvm_builder, gen_expr(g, if_statement->condition), ""), LLVMInt1Type());
+	LLVMBasicBlockRef before_block = LLVMGetInsertBlock(g->llvm_builder);
+
+	LLVMBasicBlockRef then_block = LLVMAppendBasicBlockInContext(g->llvm_context, g->llvm_func, "then");
+	LLVMBasicBlockRef else_block = LLVMAppendBasicBlockInContext(g->llvm_context, g->llvm_func, "else");
+	LLVMBasicBlockRef merge_block = LLVMAppendBasicBlockInContext(g->llvm_context, g->llvm_func, "merge");
+
+	LLVMPositionBuilderAtEnd(g->llvm_builder, before_block);
+	LLVMBuildCondBr(g->llvm_builder, condition, then_block, else_block);
+
+	LLVMPositionBuilderAtEnd(g->llvm_builder, then_block);
+	LLVMValueRef then_result = gen_expr(g, if_statement->then_block);
+	LLVMBuildBr(g->llvm_builder, merge_block);
+	then_block = LLVMGetInsertBlock(g->llvm_builder);
+
+	LLVMPositionBuilderAtEnd(g->llvm_builder, else_block);
+	LLVMValueRef else_result = if_statement->else_block ? gen_expr(g, if_statement->else_block) : NULL;
+	LLVMBuildBr(g->llvm_builder, merge_block);
+	else_block = LLVMGetInsertBlock(g->llvm_builder);
+
+	LLVMPositionBuilderAtEnd(g->llvm_builder, merge_block);
+
+	if (else_result) {
+		if (LLVMTypeOf(then_result) != LLVMTypeOf(else_result)) {
+			// TODO ERROR
+			else_result = cast_value(g, else_result, LLVMTypeOf(then_result));
+		}
+		LLVMValueRef phi = LLVMBuildPhi(g->llvm_builder, LLVMTypeOf(then_result), "");
+		LLVMValueRef incoming_values[] = { then_result, else_result };
+		LLVMBasicBlockRef incoming_blocks[] = { then_block, else_block };
+		LLVMAddIncoming(phi, incoming_values, incoming_blocks, 2);
+		return phi;
+	}
+	return then_result;
+}
+
+LLVMValueRef gen_loop(CODEGEN* g, LOOP* loop) {
+	LLVMBasicBlockRef before_block = LLVMGetInsertBlock(g->llvm_builder);
+
+	LLVMBasicBlockRef head_block = LLVMAppendBasicBlockInContext(g->llvm_context, g->llvm_func, "head");
+	LLVMBasicBlockRef loop_block = LLVMAppendBasicBlockInContext(g->llvm_context, g->llvm_func, "loop");
+	LLVMBasicBlockRef merge_block = LLVMAppendBasicBlockInContext(g->llvm_context, g->llvm_func, "merge");
+
+	g->current_scope->break_dest = merge_block;
+	g->current_scope->continue_dest = head_block;
+
+	LLVMPositionBuilderAtEnd(g->llvm_builder, before_block);
+	LLVMBuildBr(g->llvm_builder, head_block);
+
+	LLVMPositionBuilderAtEnd(g->llvm_builder, head_block);
+	if (loop->condition) {
+		LLVMValueRef condition = cast_value(g, LLVMBuildLoad(g->llvm_builder, gen_expr(g, loop->condition), ""), LLVMInt1Type());
+		LLVMBuildCondBr(g->llvm_builder, condition, loop_block, merge_block);
+	} else LLVMBuildBr(g->llvm_builder, loop_block);
+
+	LLVMPositionBuilderAtEnd(g->llvm_builder, loop_block);
+	gen_expr(g, loop->body);
+	LLVMBuildBr(g->llvm_builder, head_block);
+
+	LLVMPositionBuilderAtEnd(g->llvm_builder, merge_block);
+
+	g->current_scope->break_dest = NULL;
+	g->current_scope->continue_dest = NULL;
+
+	return NULL;
+}
+
+LLVMValueRef gen_break(CODEGEN* g, BREAK* break_statement) {
+	SCOPE* scope = g->current_scope;
+	int i = 0;
+	while (true) {
+		if (!scope->break_dest) scope = scope->parent;
+		else {
+			if (i >= break_statement->idx) break;
+			else {
+				i++;
+			}
+		}
+	}
+
+	LLVMBasicBlockRef dest = scope->break_dest;
+	return LLVMBuildBr(g->llvm_builder, dest);
+}
+
+LLVMValueRef gen_continue(CODEGEN* g, CONTINUE* continue_statement) {
+	SCOPE* scope = g->current_scope;
+	int i = 0;
+	while (true) {
+		if (!scope->continue_dest) scope = scope->parent;
+		else {
+			if (i >= continue_statement->idx) break;
+			else {
+				i++;
+			}
+		}
+	}
+
+	LLVMBasicBlockRef dest = scope->continue_dest;
+	return LLVMBuildBr(g->llvm_builder, dest);
+}
+
+LLVMValueRef gen_func_call(CODEGEN* g, FUNC_CALL* func_call) {
+	// Cast
+	if (func_call->callee->type == EXPR_TYPE_IDENTIFIER && func_call->num_args == 1) {
+		LLVMTypeRef llvm_type = NULL;
+		if (llvm_type = get_llvm_type_from_str(func_call->callee->identifier.name, true)) {
+			LLVMValueRef value = cast_value(g, LLVMBuildLoad(g->llvm_builder, gen_expr(g, &func_call->args[0]), ""), llvm_type);
+			LLVMValueRef ptr = alloc_value(g, "", LLVMTypeOf(value), g->current_scope);
+			LLVMBuildStore(g->llvm_builder, value, ptr);
+			return ptr;
+		}
+	}
+
+	LLVMValueRef callee = gen_expr(g, func_call->callee);
+
+	LLVMValueRef* args = malloc(func_call->num_args * sizeof(LLVMValueRef));
+	LLVMTypeRef* arg_types = malloc(LLVMCountParams(callee) * sizeof(LLVMTypeRef));
+	for (int i = 0; i < func_call->num_args; i++) {
+		LLVMValueRef arg = gen_expr(g, &func_call->args[i]);
+		LLVMTypeRef arg_type = LLVMTypeOf(arg);
+		LLVMTypeRef param_type = LLVMTypeOf(LLVMGetParam(callee, i));
+		if (LLVMGetTypeKind(arg_type) == LLVMGetTypeKind(param_type)) {
+			if (LLVMGetTypeKind(arg_type) == LLVMPointerTypeKind) args[i] = arg;
+			else args[i] = cast_value(g, arg, param_type);
+		} else {
+			if (LLVMGetTypeKind(arg_type) == LLVMPointerTypeKind) {
+				LLVMValueRef value = LLVMBuildLoad(g->llvm_builder, arg, "");
+				args[i] = cast_value(g, value, param_type);
+			} else if (LLVMGetTypeKind(param_type) == LLVMPointerTypeKind) {
+				LLVMValueRef ptr = LLVMBuildAlloca(g->llvm_builder, LLVMGetElementType(param_type), "");
+				LLVMBuildStore(g->llvm_builder, cast_value(g, arg, LLVMGetElementType(param_type)), ptr);
+				args[i] = ptr;
+			}
+		}
+	}
+	LLVMValueRef ret_val = LLVMBuildCall(g->llvm_builder, callee, args, func_call->num_args, "");
+	free(args);
+	return ret_val;
+}
+
 LLVMValueRef gen_func_decl(CODEGEN* g, FUNC_DECL* func_decl) {
 	LLVMTypeRef* arg_types = malloc(func_decl->num_args * sizeof(LLVMTypeRef));
 	for (int i = 0; i < func_decl->num_args; i++) {
@@ -262,12 +391,18 @@ LLVMValueRef gen_expr(CODEGEN* g, EXPRESSION* expr) {
 	case EXPR_TYPE_FLOAT_LITERAL: return gen_float_literal(g, &expr->float_literal);
 	case EXPR_TYPE_STRING_LITERAL: return gen_string_literal(g, &expr->string_literal);
 	case EXPR_TYPE_IDENTIFIER: return gen_identifier(g, &expr->identifier);
-	case EXPR_TYPE_FUNC_CALL: return gen_func_call(g, &expr->func_call);
 	case EXPR_TYPE_ASSIGN: return gen_assign(g, &expr->assign);
 	case EXPR_TYPE_BINARY_OP: return gen_binary_op(g, &expr->binary_op);
 	case EXPR_TYPE_UNARY_OP: return gen_unary_op(g, &expr->unary_op);
+	case EXPR_TYPE_COMPOUND: return gen_compound(g, &expr->compound);
+	case EXPR_TYPE_RETURN: return gen_return(g, &expr->ret_statement);
+	case EXPR_TYPE_IF_STATEMENT: return gen_if_statement(g, &expr->if_statement);
+	case EXPR_TYPE_LOOP: return gen_loop(g, &expr->loop);
+	case EXPR_TYPE_BREAK: return gen_break(g, &expr->break_statement);
+	case EXPR_TYPE_CONTINUE: return gen_continue(g, &expr->continue_statement);
+	case EXPR_TYPE_FUNC_CALL: return gen_func_call(g, &expr->func_call);
 	case EXPR_TYPE_FUNC_DECL: return gen_func_decl(g, &expr->func_decl);
-	default: return LLVMConstInt(LLVMInt32Type(), 0, true);
+	default: return NULL;
 	}
 }
 
@@ -275,14 +410,15 @@ LLVMValueRef gen_ast(CODEGEN* g, AST* ast) {
 	SCOPE* parent = g->current_scope;
 	g->current_scope = scope_new(parent);
 
+	LLVMValueRef ret_value = NULL;
 	for (int i = 0; i < ast->num_expressions; i++) {
-		gen_expr(g, &ast->expressions[i]);
+		ret_value = gen_expr(g, &ast->expressions[i]);
 	}
 
 	scope_delete(g->current_scope);
 	g->current_scope = parent;
 
-	return LLVMConstInt(LLVMInt32Type(), 0, true);
+	return ret_value;
 }
 
 void gen_toplevel(CODEGEN* g, AST* ast) {

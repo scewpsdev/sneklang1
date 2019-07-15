@@ -18,17 +18,17 @@ PARSER parser_new(LEXER* lexer) {
 void parser_delete(PARSER* parser) {
 }
 
-bool next_is_keyword(PARSER* p, char* kw) {
+bool next_is_keyword(PARSER* p, const char* kw) {
 	TOKEN tok = lexer_peek(p->input);
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_KEYWORD && (kw[0] == 0 || strcmp(kw, tok.value) == 0);
 }
 
-bool next_is_punc(PARSER* p, char c) {
+bool next_is_punc(PARSER* p, const char c) {
 	TOKEN tok = lexer_peek(p->input);
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_PUNC && (c == 0 || tok.value[0] == c);
 }
 
-bool next_is_op(PARSER* p, char* c) {
+bool next_is_op(PARSER* p, const char* c) {
 	TOKEN tok = lexer_peek(p->input);
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_OP && (c[0] == 0 || strcmp(tok.value, c) == 0);
 }
@@ -38,23 +38,35 @@ void skip_separator(PARSER* p) {
 	else lexer_error(p->input, "SEPARATOR expected");
 }
 
+void skip_all_separators(PARSER* p) {
+	while (!lexer_eof(p->input) && lexer_peek(p->input).type == TOKEN_TYPE_SEPARATOR) {
+		skip_separator(p);
+	}
+}
+
+void skip_keyword(PARSER* p, const char* kw) {
+	if (next_is_keyword(p, kw)) lexer_next(p->input);
+	else lexer_error(p->input, "Keyword '%s' expected", kw);
+}
+
 void skip_punc(PARSER* p, char c) {
 	if (next_is_punc(p, c)) lexer_next(p->input);
 	else lexer_error(p->input, "TOKEN '%c' expected", c);
 }
 
-void skip_op(PARSER* p, char* op) {
+void skip_op(PARSER* p, const char* op) {
 	if (next_is_op(p, op)) lexer_next(p->input);
 	else lexer_error(p->input, "TOKEN '%s' expected", op);
 }
 
-int get_op_precedence(char* op) {
+int get_op_precedence(const char* op) {
 	for (int i = 0; i < NUM_OPS; i++) {
 		if (strcmp(OP_MAP_K[i], op) == 0) return OP_MAP_V[i];
 	}
 	return -1;
 }
 
+AST parse_ast(PARSER* p);
 EXPRESSION parse_expr(PARSER* p);
 EXPRESSION parse_atom(PARSER* p);
 EXPRESSION parse_call(PARSER* p, EXPRESSION func);
@@ -100,15 +112,83 @@ EXPRESSION maybe_binary(PARSER* p, EXPRESSION e, int prec) {
 	return e;
 }
 
-EXPRESSION parse_bool(PARSER* p) {
-	return (EXPRESSION) { EXPR_TYPE_BOOL_LITERAL, .bool_literal = { strcmp(lexer_next(p->input).value, "false") } };
+EXPRESSION parse_compound(PARSER* p) {
+	skip_punc(p, '{');
+	AST* ast = malloc(sizeof(AST));
+	*ast = parse_ast(p);
+	skip_punc(p, '}');
+	return (EXPRESSION) { EXPR_TYPE_COMPOUND, .compound = { ast } };
+}
+
+EXPRESSION parse_return(PARSER* p) {
+	skip_keyword(p, KEYWORD_RETURN);
+	EXPRESSION* value = malloc(sizeof(EXPRESSION));
+	*value = parse_expr(p);
+	return (EXPRESSION) { EXPR_TYPE_RETURN, .ret_statement = { value } };
+}
+
+EXPRESSION parse_if(PARSER* p) {
+	skip_keyword(p, KEYWORD_IF);
+	EXPRESSION* condition = malloc(sizeof(EXPRESSION));
+	*condition = parse_expr(p);
+	EXPRESSION* then_block = malloc(sizeof(EXPRESSION));
+	*then_block = parse_expr(p);
+	EXPRESSION* else_block = NULL;
+	if (next_is_keyword(p, KEYWORD_ELSE)) {
+		skip_keyword(p, KEYWORD_ELSE);
+		else_block = malloc(sizeof(EXPRESSION));
+		*else_block = parse_expr(p);
+	}
+	return (EXPRESSION) { EXPR_TYPE_IF_STATEMENT, .if_statement = { condition, then_block, else_block } };
+}
+
+EXPRESSION parse_loop(PARSER* p) {
+	skip_keyword(p, KEYWORD_LOOP);
+	EXPRESSION* body = malloc(sizeof(EXPRESSION));
+	*body = parse_expr(p);
+	return (EXPRESSION) { EXPR_TYPE_LOOP, .loop = { NULL, body } };
+}
+
+EXPRESSION parse_while(PARSER* p) {
+	skip_keyword(p, KEYWORD_WHILE);
+	EXPRESSION* condition = malloc(sizeof(EXPRESSION));
+	*condition = parse_expr(p);
+	EXPRESSION* body = malloc(sizeof(EXPRESSION));
+	*body = parse_expr(p);
+	return (EXPRESSION) { EXPR_TYPE_LOOP, .loop = { condition, body } };
+}
+
+EXPRESSION parse_break(PARSER* p) {
+	skip_keyword(p, KEYWORD_BREAK);
+	uint8_t idx = 0;
+	if (next_is_punc(p, '(')) {
+		skip_punc(p, '(');
+		TOKEN index_token = lexer_next(p->input);
+		if (index_token.type != TOKEN_TYPE_INT) lexer_error(p->input, "Break index must be of type integer");
+		else idx = (uint8_t)strtol(index_token.value, NULL, 0);
+		skip_punc(p, ')');
+	}
+	return (EXPRESSION) { EXPR_TYPE_BREAK, .break_statement = { idx } };
+}
+
+EXPRESSION parse_continue(PARSER* p) {
+	skip_keyword(p, KEYWORD_CONTINUE);
+	uint8_t idx = 0;
+	if (next_is_punc(p, '(')) {
+		skip_punc(p, '(');
+		TOKEN index_token = lexer_next(p->input);
+		if (index_token.type != TOKEN_TYPE_INT) lexer_error(p->input, "Continue index must be of type integer");
+		else idx = (uint8_t)strtol(index_token.value, NULL, 0);
+		skip_punc(p, ')');
+	}
+	return (EXPRESSION) { EXPR_TYPE_CONTINUE, .continue_statement = { idx } };
 }
 
 EXPRESSION parse_call(PARSER* p, EXPRESSION func) {
 	EXPR_VEC arglist = delimited_expr(p, '(', ')', ',', parse_expr);
 	EXPRESSION* funcptr = malloc(sizeof(EXPRESSION));
 	*funcptr = func;
-	return (EXPRESSION) { EXPR_TYPE_FUNC_CALL, .func_call = (FUNC_CALL){ funcptr, arglist.buffer, arglist.size } };
+	return (EXPRESSION) { EXPR_TYPE_FUNC_CALL, .func_call = (FUNC_CALL){ funcptr, arglist.buffer, (uint8_t)arglist.size } };
 }
 
 TYPE parse_type(PARSER* p) {
@@ -142,7 +222,7 @@ VAR_DECL_VEC parse_arg_list(PARSER* p) {
 }
 
 EXPRESSION parse_func_decl(PARSER* p) {
-	lexer_next(p->input);
+	skip_keyword(p, KEYWORD_FUNC_DECL);
 	char* funcname = lexer_next(p->input).value;
 	skip_punc(p, '(');
 	VAR_DECL_VEC argvec = parse_arg_list(p);
@@ -155,13 +235,20 @@ EXPRESSION parse_func_decl(PARSER* p) {
 EXPRESSION parse_atom(PARSER* p) {
 	while (lexer_peek(p->input).type == TOKEN_TYPE_SEPARATOR) lexer_next(p->input);
 
-	if (next_is_keyword(p, "true") || next_is_keyword(p, "false")) return parse_bool(p);
+	if (next_is_keyword(p, KEYWORD_TRUE) || next_is_keyword(p, KEYWORD_FALSE)) return (EXPRESSION) { EXPR_TYPE_BOOL_LITERAL, .bool_literal = { strcmp(lexer_next(p->input).value, KEYWORD_FALSE) } };
 	if (next_is_op(p, "*")) {
 		char* op = lexer_next(p->input).value;
 		EXPRESSION* expr = malloc(sizeof(EXPRESSION));
 		*expr = maybe_unary(p, parse_atom(p));
 		return (EXPRESSION) { EXPR_TYPE_UNARY_OP, .unary_op = (UNARY_OP){ op, false, expr } };
 	}
+	if (next_is_punc(p, '{')) return parse_compound(p);
+	if (next_is_keyword(p, KEYWORD_RETURN)) return parse_return(p);
+	if (next_is_keyword(p, KEYWORD_IF)) return parse_if(p);
+	if (next_is_keyword(p, KEYWORD_LOOP)) return parse_loop(p);
+	if (next_is_keyword(p, KEYWORD_WHILE)) return parse_while(p);
+	if (next_is_keyword(p, KEYWORD_BREAK)) return parse_break(p);
+	if (next_is_keyword(p, KEYWORD_CONTINUE)) return parse_continue(p);
 	if (next_is_keyword(p, KEYWORD_FUNC_DECL)) return parse_func_decl(p);
 
 	TOKEN tok = lexer_next(p->input);
@@ -183,9 +270,20 @@ EXPRESSION parse_expr(PARSER* p) {
 
 AST parse_ast(PARSER* p) {
 	EXPR_VEC expressions = evec_new(10);
-	while (!lexer_eof(p->input)) {
+	skip_all_separators(p);
+	while (!lexer_eof(p->input) && !next_is_punc(p, '}')) {
 		evec_push(&expressions, parse_expr(p));
 		if (!lexer_eof(p->input)) skip_separator(p);
 	}
 	return (AST) { expressions.buffer, expressions.size };
+}
+
+void delete_expr(EXPRESSION* expr) {
+
+}
+
+void delete_ast(AST* ast) {
+	for (int i = 0; i < ast->num_expressions; i++) {
+		delete_expr(&ast->expressions[i]);
+	}
 }

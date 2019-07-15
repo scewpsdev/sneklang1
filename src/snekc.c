@@ -44,11 +44,13 @@ int main(int argc, char** argv) {
 		printf("### LLVM ###\n");
 		gen_create_module(&gen, &ast);
 
+		delete_ast(&ast);
 		parser_delete(&parser);
 		lexer_delete(&lexer);
 		input_delete(&input);
 	}
 	gen_link(&gen);
+	gen_delete(&gen);
 
 	return 0;
 }

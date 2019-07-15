@@ -12,6 +12,10 @@
 
 typedef struct SCOPE_t {
 	struct SCOPE_t* parent;
+
+	LLVMBasicBlockRef break_dest;
+	LLVMBasicBlockRef continue_dest;
+
 	STRING_VEC locals_k;
 	VALUE_VEC locals_v;
 } SCOPE;

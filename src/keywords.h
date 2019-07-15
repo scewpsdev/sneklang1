@@ -4,3 +4,10 @@
 #define KEYWORD_FALSE "false"
 
 #define KEYWORD_FUNC_DECL "decl"
+#define KEYWORD_RETURN "ret"
+#define KEYWORD_IF "if"
+#define KEYWORD_ELSE "else"
+#define KEYWORD_LOOP "loop"
+#define KEYWORD_WHILE "while"
+#define KEYWORD_BREAK "break"
+#define KEYWORD_CONTINUE "continue"

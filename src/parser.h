@@ -16,3 +16,4 @@ PARSER parser_new(LEXER* lexer);
 void parser_delete(PARSER* parser);
 
 AST parse_ast(PARSER* p);
+void delete_ast(AST* ast);

@@ -13,10 +13,17 @@ enum EXPR_TYPE {
 	EXPR_TYPE_FLOAT_LITERAL,
 	EXPR_TYPE_STRING_LITERAL,
 	EXPR_TYPE_IDENTIFIER,
-	EXPR_TYPE_FUNC_CALL,
+
 	EXPR_TYPE_ASSIGN,
-	EXPR_TYPE_UNARY_OP,
 	EXPR_TYPE_BINARY_OP,
+	EXPR_TYPE_UNARY_OP,
+	EXPR_TYPE_COMPOUND,
+	EXPR_TYPE_RETURN,
+	EXPR_TYPE_IF_STATEMENT,
+	EXPR_TYPE_LOOP,
+	EXPR_TYPE_BREAK,
+	EXPR_TYPE_CONTINUE,
+	EXPR_TYPE_FUNC_CALL,
 
 	EXPR_TYPE_FUNC_DECL
 };
@@ -76,6 +83,33 @@ typedef struct UNARY_OP_t {
 	EXPRESSION* expr;
 } UNARY_OP;
 
+typedef struct COMPOUND_t {
+	struct AST* ast;
+} COMPOUND;
+
+typedef struct RETURN_t {
+	EXPRESSION* value;
+} RETURN;
+
+typedef struct IF_t {
+	EXPRESSION* condition;
+	EXPRESSION* then_block;
+	EXPRESSION* else_block;
+} IF;
+
+typedef struct LOOP_t {
+	EXPRESSION* condition;
+	EXPRESSION* body;
+} LOOP;
+
+typedef struct BREAK_t {
+	uint8_t idx;
+} BREAK;
+
+typedef struct CONTINUE_t {
+	uint8_t idx;
+} CONTINUE;
+
 typedef struct VAR_DECL_t {
 	TYPE type;
 	char* name;
@@ -98,9 +132,15 @@ typedef struct EXPRESSION_t {
 		IDENTIFIER identifier;
 
 		ASSIGN assign;
-		FUNC_CALL func_call;
-		UNARY_OP unary_op;
 		BINARY_OP binary_op;
+		UNARY_OP unary_op;
+		COMPOUND compound;
+		RETURN ret_statement;
+		IF if_statement;
+		LOOP loop;
+		BREAK break_statement;
+		CONTINUE continue_statement;
+		FUNC_CALL func_call;
 		FUNC_DECL func_decl;
 	};
 } EXPRESSION;
