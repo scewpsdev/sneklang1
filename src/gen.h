@@ -29,6 +29,7 @@ typedef struct CODEGEN_t {
 	SCOPE* current_scope;
 	LLVMModuleRef llvm_module;
 	LLVMValueRef llvm_func;
+	bool has_branched;
 
 	STRING_VEC globals_k;
 	VALUE_VEC globals_v;

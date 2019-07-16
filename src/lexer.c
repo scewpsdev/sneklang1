@@ -26,6 +26,7 @@ LEXER lexer_new(INPUTSTREAM* input) {
 
 	l.input = input;
 	l.current = TOKEN_NULL;
+	l.last = TOKEN_NULL;
 	l.line = 1;
 	l.col = 1;
 
@@ -205,6 +206,7 @@ TOKEN read_next(LEXER* l) {
 
 TOKEN lexer_next(LEXER* l) {
 	TOKEN tok = l->current;
+	l->last = tok;
 	l->current = TOKEN_NULL;
 	l->line = l->input->line;
 	l->col = l->input->col;

@@ -59,12 +59,6 @@ typedef struct IDENTIFIER_t {
 	char* name;
 } IDENTIFIER;
 
-typedef struct FUNC_CALL_t {
-	EXPRESSION* callee;
-	EXPRESSION* args;
-	uint8_t num_args;
-} FUNC_CALL;
-
 typedef struct ASSIGN_t {
 	char* op;
 	EXPRESSION* left;
@@ -109,6 +103,12 @@ typedef struct BREAK_t {
 typedef struct CONTINUE_t {
 	uint8_t idx;
 } CONTINUE;
+
+typedef struct FUNC_CALL_t {
+	EXPRESSION* callee;
+	EXPRESSION* args;
+	uint8_t num_args;
+} FUNC_CALL;
 
 typedef struct VAR_DECL_t {
 	TYPE type;

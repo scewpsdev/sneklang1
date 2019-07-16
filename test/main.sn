@@ -36,9 +36,8 @@ while i < 5 {
 i = 0
 loop {
 	if i >= 5 break
-	else continue
-	putchar('V')
 	i = i + 1
+	putchar('V')
 }
 
 putchar('\n')

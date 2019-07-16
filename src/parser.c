@@ -18,21 +18,6 @@ PARSER parser_new(LEXER* lexer) {
 void parser_delete(PARSER* parser) {
 }
 
-bool next_is_keyword(PARSER* p, const char* kw) {
-	TOKEN tok = lexer_peek(p->input);
-	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_KEYWORD && (kw[0] == 0 || strcmp(kw, tok.value) == 0);
-}
-
-bool next_is_punc(PARSER* p, const char c) {
-	TOKEN tok = lexer_peek(p->input);
-	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_PUNC && (c == 0 || tok.value[0] == c);
-}
-
-bool next_is_op(PARSER* p, const char* c) {
-	TOKEN tok = lexer_peek(p->input);
-	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_OP && (c[0] == 0 || strcmp(tok.value, c) == 0);
-}
-
 void skip_separator(PARSER* p) {
 	if (lexer_peek(p->input).type == TOKEN_TYPE_SEPARATOR) lexer_next(p->input);
 	else lexer_error(p->input, "SEPARATOR expected");
@@ -42,6 +27,24 @@ void skip_all_separators(PARSER* p) {
 	while (!lexer_eof(p->input) && lexer_peek(p->input).type == TOKEN_TYPE_SEPARATOR) {
 		skip_separator(p);
 	}
+}
+
+bool next_is_keyword(PARSER* p, const char* kw) {
+	skip_all_separators(p);
+	TOKEN tok = lexer_peek(p->input);
+	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_KEYWORD && (kw[0] == 0 || strcmp(kw, tok.value) == 0);
+}
+
+bool next_is_punc(PARSER* p, const char c) {
+	skip_all_separators(p);
+	TOKEN tok = lexer_peek(p->input);
+	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_PUNC && (c == 0 || tok.value[0] == c);
+}
+
+bool next_is_op(PARSER* p, const char* c) {
+	skip_all_separators(p);
+	TOKEN tok = lexer_peek(p->input);
+	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_OP && (c[0] == 0 || strcmp(tok.value, c) == 0);
 }
 
 void skip_keyword(PARSER* p, const char* kw) {
@@ -273,13 +276,131 @@ AST parse_ast(PARSER* p) {
 	skip_all_separators(p);
 	while (!lexer_eof(p->input) && !next_is_punc(p, '}')) {
 		evec_push(&expressions, parse_expr(p));
-		if (!lexer_eof(p->input)) skip_separator(p);
+		if (!lexer_eof(p->input) && p->input->last.type != TOKEN_TYPE_SEPARATOR) skip_separator(p);
 	}
 	return (AST) { expressions.buffer, expressions.size };
 }
 
-void delete_expr(EXPRESSION* expr) {
+void delete_expr(EXPRESSION* expr);
+void delete_ast(AST* ast);
 
+void delete_int_literal(INT* i) {
+}
+
+void delete_char_literal(CHAR* ch) {
+}
+
+void delete_bool_literal(BOOL* b) {
+}
+
+void delete_float_literal(FLOAT* f) {
+}
+
+void delete_string_literal(STRING* str) {
+}
+
+void delete_identifier(IDENTIFIER* i) {
+}
+
+void delete_assign(ASSIGN* assign) {
+	delete_expr(assign->left);
+	free(assign->left);
+	assign->left = NULL;
+	delete_expr(assign->right);
+	free(assign->right);
+	assign->right = NULL;
+}
+
+void delete_binary_op(BINARY_OP* binary_op) {
+	delete_expr(binary_op->left);
+	free(binary_op->left);
+	binary_op->left = NULL;
+	delete_expr(binary_op->right);
+	free(binary_op->right);
+	binary_op->right = NULL;
+}
+
+void delete_unary_op(UNARY_OP* unary_op) {
+	delete_expr(unary_op->expr);
+	free(unary_op->expr);
+	unary_op->expr = NULL;
+}
+
+void delete_compound(COMPOUND* compound) {
+	delete_ast(compound->ast);
+}
+
+void delete_return(RETURN* ret_statement) {
+	delete_expr(ret_statement->value);
+	free(ret_statement->value);
+	ret_statement->value = NULL;
+}
+
+void delete_if_statement(IF* if_statement) {
+	delete_expr(if_statement->condition);
+	free(if_statement->condition);
+	if_statement->condition = NULL;
+	delete_expr(if_statement->then_block);
+	free(if_statement->then_block);
+	if_statement->then_block = NULL;
+	if (if_statement->else_block) {
+		delete_expr(if_statement->else_block);
+		free(if_statement->else_block);
+		if_statement->else_block = NULL;
+	}
+}
+
+void delete_loop(LOOP* loop) {
+	if (loop->condition) {
+		delete_expr(loop->condition);
+		free(loop->condition);
+		loop->condition = NULL;
+	}
+	delete_expr(loop->body);
+	free(loop->body);
+	loop->body = NULL;
+}
+
+void delete_break(BREAK* break_statement) {
+}
+
+void delete_continue(CONTINUE* continue_statement) {
+}
+
+void delete_func_call(FUNC_CALL* func_call) {
+	delete_expr(func_call->callee);
+	free(func_call->callee);
+	func_call->callee = NULL;
+	for (int i = 0; i < func_call->num_args; i++) {
+		delete_expr(&func_call->args[i]);
+	}
+}
+
+void delete_func_decl(FUNC_DECL* func_decl) {
+	free(func_decl->args);
+}
+
+void delete_expr(EXPRESSION* expr) {
+	switch (expr->type) {
+	case EXPR_TYPE_INT_LITERAL: delete_int_literal(&expr->int_literal); break;
+	case EXPR_TYPE_CHAR_LITERAL: delete_char_literal(&expr->char_literal); break;
+	case EXPR_TYPE_BOOL_LITERAL: delete_bool_literal(&expr->bool_literal); break;
+	case EXPR_TYPE_FLOAT_LITERAL: delete_float_literal(&expr->float_literal); break;
+	case EXPR_TYPE_STRING_LITERAL: delete_string_literal(&expr->string_literal); break;
+	case EXPR_TYPE_IDENTIFIER: delete_identifier(&expr->identifier); break;
+	case EXPR_TYPE_ASSIGN: delete_assign(&expr->assign); break;
+	case EXPR_TYPE_BINARY_OP: delete_binary_op(&expr->binary_op); break;
+	case EXPR_TYPE_UNARY_OP: delete_unary_op(&expr->unary_op); break;
+	case EXPR_TYPE_COMPOUND: delete_compound(&expr->compound); break;
+	case EXPR_TYPE_RETURN: delete_return(&expr->ret_statement); break;
+	case EXPR_TYPE_IF_STATEMENT: delete_if_statement(&expr->if_statement); break;
+	case EXPR_TYPE_LOOP: delete_loop(&expr->loop); break;
+	case EXPR_TYPE_BREAK: delete_break(&expr->break_statement); break;
+	case EXPR_TYPE_CONTINUE: delete_continue(&expr->continue_statement); break;
+	case EXPR_TYPE_FUNC_CALL: delete_func_call(&expr->func_call); break;
+	case EXPR_TYPE_FUNC_DECL: delete_func_decl(&expr->func_decl); break;
+	default:  break;
+	}
 }
 
 void delete_ast(AST* ast) {

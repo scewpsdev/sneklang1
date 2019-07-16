@@ -35,6 +35,7 @@ CODEGEN gen_new() {
 	g.current_scope = NULL;
 	g.llvm_module = NULL;
 	g.llvm_func = NULL;
+	g.has_branched = false;
 
 	g.globals_k = strvec_new(8);
 	g.globals_v = valvec_new(8);
@@ -243,17 +244,22 @@ LLVMValueRef gen_if_statement(CODEGEN* g, IF* if_statement) {
 
 	LLVMPositionBuilderAtEnd(g->llvm_builder, then_block);
 	LLVMValueRef then_result = gen_expr(g, if_statement->then_block);
-	LLVMBuildBr(g->llvm_builder, merge_block);
+	if (!g->has_branched) LLVMBuildBr(g->llvm_builder, merge_block);
+	else g->has_branched = false;
 	then_block = LLVMGetInsertBlock(g->llvm_builder);
 
 	LLVMPositionBuilderAtEnd(g->llvm_builder, else_block);
-	LLVMValueRef else_result = if_statement->else_block ? gen_expr(g, if_statement->else_block) : NULL;
-	LLVMBuildBr(g->llvm_builder, merge_block);
-	else_block = LLVMGetInsertBlock(g->llvm_builder);
+	LLVMValueRef else_result = NULL;
+	if (if_statement->else_block) {
+		else_result = gen_expr(g, if_statement->else_block);
+		if (!g->has_branched) LLVMBuildBr(g->llvm_builder, merge_block);
+		else g->has_branched = false;
+		else_block = LLVMGetInsertBlock(g->llvm_builder);
+	} else LLVMBuildBr(g->llvm_builder, merge_block);
 
 	LLVMPositionBuilderAtEnd(g->llvm_builder, merge_block);
 
-	if (else_result) {
+	if (then_result && else_result) {
 		if (LLVMTypeOf(then_result) != LLVMTypeOf(else_result)) {
 			// TODO ERROR
 			else_result = cast_value(g, else_result, LLVMTypeOf(then_result));
@@ -264,7 +270,9 @@ LLVMValueRef gen_if_statement(CODEGEN* g, IF* if_statement) {
 		LLVMAddIncoming(phi, incoming_values, incoming_blocks, 2);
 		return phi;
 	}
-	return then_result;
+	if (then_result) return then_result;
+	else if (else_result) return else_result;
+	else return NULL;
 }
 
 LLVMValueRef gen_loop(CODEGEN* g, LOOP* loop) {
@@ -288,7 +296,8 @@ LLVMValueRef gen_loop(CODEGEN* g, LOOP* loop) {
 
 	LLVMPositionBuilderAtEnd(g->llvm_builder, loop_block);
 	gen_expr(g, loop->body);
-	LLVMBuildBr(g->llvm_builder, head_block);
+	if (!g->has_branched) LLVMBuildBr(g->llvm_builder, head_block);
+	else g->has_branched = false;
 
 	LLVMPositionBuilderAtEnd(g->llvm_builder, merge_block);
 
@@ -311,8 +320,11 @@ LLVMValueRef gen_break(CODEGEN* g, BREAK* break_statement) {
 		}
 	}
 
+	g->has_branched = true;
 	LLVMBasicBlockRef dest = scope->break_dest;
-	return LLVMBuildBr(g->llvm_builder, dest);
+	LLVMBuildBr(g->llvm_builder, dest);
+
+	return NULL;
 }
 
 LLVMValueRef gen_continue(CODEGEN* g, CONTINUE* continue_statement) {
@@ -328,8 +340,11 @@ LLVMValueRef gen_continue(CODEGEN* g, CONTINUE* continue_statement) {
 		}
 	}
 
+	g->has_branched = true;
 	LLVMBasicBlockRef dest = scope->continue_dest;
-	return LLVMBuildBr(g->llvm_builder, dest);
+	LLVMBuildBr(g->llvm_builder, dest);
+
+	return NULL;
 }
 
 LLVMValueRef gen_func_call(CODEGEN* g, FUNC_CALL* func_call) {
@@ -413,6 +428,7 @@ LLVMValueRef gen_ast(CODEGEN* g, AST* ast) {
 	LLVMValueRef ret_value = NULL;
 	for (int i = 0; i < ast->num_expressions; i++) {
 		ret_value = gen_expr(g, &ast->expressions[i]);
+		if (g->has_branched) break;
 	}
 
 	scope_delete(g->current_scope);
