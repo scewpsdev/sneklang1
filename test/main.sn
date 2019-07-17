@@ -4,7 +4,6 @@
 decl putchar(*i32 Char)
 decl printf(i8 format)
 
-/*
 b = 102
 c = 'c'
 d = true
@@ -31,7 +30,6 @@ while i < 5 {
 	putchar('W')
 	i = i + 1
 }
-*/
 
 i = 0
 loop {
