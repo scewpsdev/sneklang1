@@ -34,7 +34,7 @@ while i < 5 {
 i = 0
 loop {
 	if i >= 5 break
-	i = i + 1
+	++i
 	putchar('V')
 }
 

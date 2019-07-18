@@ -91,6 +91,13 @@ EXPR_VEC delimited_expr(PARSER* p, char start, char end, char separator, EXPRESS
 
 EXPRESSION maybe_unary(PARSER* p, EXPRESSION e) {
 	if (next_is_punc(p, '(')) return maybe_unary(p, parse_call(p, e));
+	if (next_is_op(p, "++") || next_is_op(p, "--")) {
+		TOKEN op_token = lexer_next(p->input);
+		EXPRESSION* expr = malloc(sizeof(EXPRESSION));
+		*expr = e;
+		char* op = strcmp(op_token.value, "++") == 0 ? "+=" : "-=";
+		return maybe_unary(p, (EXPRESSION) { EXPR_TYPE_UNARY_OP, .assign = { op, true, expr } });
+	}
 	return e;
 }
 
@@ -239,7 +246,7 @@ EXPRESSION parse_atom(PARSER* p) {
 	while (lexer_peek(p->input).type == TOKEN_TYPE_SEPARATOR) lexer_next(p->input);
 
 	if (next_is_keyword(p, KEYWORD_TRUE) || next_is_keyword(p, KEYWORD_FALSE)) return (EXPRESSION) { EXPR_TYPE_BOOL_LITERAL, .bool_literal = { strcmp(lexer_next(p->input).value, KEYWORD_FALSE) } };
-	if (next_is_op(p, "*")) {
+	if (next_is_op(p, "*") || next_is_op(p, "-") || next_is_op(p, "+") || next_is_op(p, "++") || next_is_op(p, "--")) {
 		char* op = lexer_next(p->input).value;
 		EXPRESSION* expr = malloc(sizeof(EXPRESSION));
 		*expr = maybe_unary(p, parse_atom(p));

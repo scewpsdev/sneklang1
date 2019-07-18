@@ -125,6 +125,12 @@ LLVMValueRef alloc_value(CODEGEN* g, char* name, LLVMTypeRef type, SCOPE* scope)
 	return ptr;
 }
 
+LLVMValueRef alloc_value_with_content(CODEGEN* g, char* name, LLVMValueRef value, SCOPE* scope) {
+	LLVMValueRef ptr = alloc_value(g, name, LLVMTypeOf(value), scope);
+	LLVMBuildStore(g->llvm_builder, value, ptr);
+	return ptr;
+}
+
 LLVMValueRef gen_expr(CODEGEN*, EXPRESSION*);
 LLVMValueRef gen_ast(CODEGEN*, AST*);
 
@@ -167,22 +173,6 @@ LLVMValueRef gen_identifier(CODEGEN* g, IDENTIFIER* i) {
 	return find_named_value(g, g->current_scope, i->name);
 }
 
-LLVMValueRef gen_assign(CODEGEN* g, ASSIGN* assign) {
-	LLVMValueRef left = gen_expr(g, assign->left);
-	LLVMValueRef right = gen_expr(g, assign->right);
-	if (strcmp(assign->op, "=") == 0 && !left) {
-		if (assign->left->type != EXPR_TYPE_IDENTIFIER) {
-			// TODO ERROR
-		}
-		strvec_push(&g->current_scope->locals_k, assign->left->identifier.name);
-		valvec_push(&g->current_scope->locals_v, right);
-	} else {
-		LLVMBuildStore(g->llvm_builder, cast_value(g, LLVMBuildLoad(g->llvm_builder, right, ""), LLVMGetElementType(LLVMTypeOf(left))), left);
-	}
-
-	return right;
-}
-
 LLVMValueRef create_binary_op(CODEGEN* g, const char* op, LLVMValueRef left, LLVMValueRef right) {
 	LLVMTypeRef ltype = LLVMTypeOf(left);
 	LLVMTypeRef rtype = LLVMTypeOf(right);
@@ -207,6 +197,31 @@ LLVMValueRef create_binary_op(CODEGEN* g, const char* op, LLVMValueRef left, LLV
 	return NULL;
 }
 
+LLVMValueRef gen_assign(CODEGEN* g, ASSIGN* assign) {
+	LLVMValueRef left = gen_expr(g, assign->left);
+	LLVMValueRef right = gen_expr(g, assign->right);
+	if (strcmp(assign->op, "=") == 0 && !left) {
+		if (assign->left->type != EXPR_TYPE_IDENTIFIER) {
+			// TODO ERROR
+		}
+		strvec_push(&g->current_scope->locals_k, assign->left->identifier.name);
+		valvec_push(&g->current_scope->locals_v, right);
+	} else if (assign->op[strlen(assign->op) - 1] == '=') {
+		LLVMValueRef value = NULL;
+		switch (assign->op[0]) {
+		case '=': value = LLVMBuildLoad(g->llvm_builder, right, ""); break;
+		case '+': value = create_binary_op(g, "+", LLVMBuildLoad(g->llvm_builder, left, ""), LLVMBuildLoad(g->llvm_builder, right, "")); break;
+		case '-': value = create_binary_op(g, "-", LLVMBuildLoad(g->llvm_builder, left, ""), LLVMBuildLoad(g->llvm_builder, right, "")); break;
+		case '*': value = create_binary_op(g, "*", LLVMBuildLoad(g->llvm_builder, left, ""), LLVMBuildLoad(g->llvm_builder, right, "")); break;
+		case '/': value = create_binary_op(g, "/", LLVMBuildLoad(g->llvm_builder, left, ""), LLVMBuildLoad(g->llvm_builder, right, "")); break;
+		case '%': value = create_binary_op(g, "%", LLVMBuildLoad(g->llvm_builder, left, ""), LLVMBuildLoad(g->llvm_builder, right, "")); break;
+		}
+		LLVMBuildStore(g->llvm_builder, cast_value(g, value, LLVMGetElementType(LLVMTypeOf(left))), left);
+	}
+
+	return right;
+}
+
 LLVMValueRef gen_binary_op(CODEGEN* g, BINARY_OP* binary_op) {
 	LLVMValueRef value = create_binary_op(g, binary_op->op, LLVMBuildLoad(g->llvm_builder, gen_expr(g, binary_op->left), ""), LLVMBuildLoad(g->llvm_builder, gen_expr(g, binary_op->right), ""));
 	LLVMValueRef ptr = alloc_value(g, "", LLVMTypeOf(value), g->current_scope);
@@ -219,6 +234,13 @@ LLVMValueRef gen_unary_op(CODEGEN* g, UNARY_OP* unary_op) {
 	LLVMValueRef expr = gen_expr(g, unary_op->expr);
 
 	if (strcmp(unary_op->op, "*") == 0) return LLVMBuildLoad(g->llvm_builder, expr, "abc");
+	if (strcmp(unary_op->op, "++") == 0 || strcmp(unary_op->op, "--") == 0) {
+		LLVMValueRef initial_value = LLVMBuildLoad(g->llvm_builder, unary_op->expr, "");
+		char* op = strcmp(unary_op->op, "++") == 0 ? "+" : "-";
+		LLVMValueRef result = create_binary_op(g, op, initial_value, LLVMConstInt(LLVMInt64Type(), 1, true));
+		LLVMBuildStore(g->llvm_builder, result, expr);
+		return alloc_value_with_content(g, "", unary_op->position ? result : initial_value, g->current_scope);
+	}
 
 	return NULL;
 }
