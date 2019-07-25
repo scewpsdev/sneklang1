@@ -30,7 +30,7 @@ typedef struct TOKEN_t {
 
 typedef struct LEXER_t {
 	INPUTSTREAM* input;
-	TOKEN current, last;
+	//TOKEN current, last;
 	long line, col;
 
 	STRING_VEC token_data;

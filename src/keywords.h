@@ -11,3 +11,5 @@
 #define KEYWORD_WHILE "while"
 #define KEYWORD_BREAK "break"
 #define KEYWORD_CONTINUE "continue"
+
+#define KEYWORD_IMPORT "use"

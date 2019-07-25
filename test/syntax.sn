@@ -1,52 +1,36 @@
-//This is a line comment
-/*
-	This is a block comment
-*/
-load(cmd);
-load(file);
-load(string);
-load(array);
+// This is a line comment
+/* This is a block comment */
 
-cmd.write(a = null);
-cmd.write(b = 5);
-cmd.write(c = 'c');
-cmd.write(d = true);
-cmd.write(e = 0.5);
-cmd.write(f = "hello world");
-cmd.write(g = [1, 2, 3, 4, 5]);
+decl putchar(*i32 Char)
+decl printf(i8 format)
 
-content = file.open("input.txt").read();
-numbers = <i32[]>(string.split(content, '\n'));
-file.open("output.txt").write(numbers);
-cmd.write(sum = array.sum(numbers));
-if true {
-	cmd.write("true");
-} else {
-	cmd.write("false");
+putchar(b = 99)
+putchar(c = 'c')
+putchar(100 + (d = true))
+putchar(i64(e = 99.5))
+printf(f = "\nhello world\n")
+
+letter = if c == 'd' 'Y' else 'N'
+if (c == 'c') {
+	putchar('-')
 }
+putchar(letter)
+putchar('\n')
 
-while sum = i = 0 < numbers.length {
-	i %= numbers.length;
-	sum += numbers[i++];
+i = 0
+while i++ < 5 {
+	putchar('W')
 }
-cmd.write("Sum: " + sum);
+putchar('\n')
 
-l = 6;
-r = 3;
-l + r;
-l - r;
-l * r;
-l / r;
-l % r;
-l << r;
-l >> r;
-l & r;
-l | r;
-l ^ r;
-l == r;
-l < r;
-l <= r;
-l > r;
-l >= r;
-l && r;
-l || r;
+i = 0
+loop {
+	if i++ >= 5 break
+	putchar('V')
+}
+putchar('\n')
+
+l = 6; r = 3
+(l + r) + (l - r) + (l * r) + (l / r) + (l % r)
+//(l << r) + (l >> r) + (l & r) + (l | r) + (l ^ r)
+(l == r) + (l < r) + (l <= r) + (l > r) + (l >= r) + (l && r) + (l || r)

@@ -10,6 +10,7 @@
 const char* KEYWORDS[] = {
 	KEYWORD_TRUE,
 	KEYWORD_FALSE,
+
 	KEYWORD_FUNC_DECL,
 	KEYWORD_RETURN,
 	KEYWORD_IF,
@@ -18,6 +19,9 @@ const char* KEYWORDS[] = {
 	KEYWORD_WHILE,
 	KEYWORD_BREAK,
 	KEYWORD_CONTINUE,
+
+	KEYWORD_IMPORT,
+
 	""
 };
 
@@ -25,8 +29,8 @@ LEXER lexer_new(INPUTSTREAM* input) {
 	LEXER l;
 
 	l.input = input;
-	l.current = TOKEN_NULL;
-	l.last = TOKEN_NULL;
+	//l.current = TOKEN_NULL;
+	//l.last = TOKEN_NULL;
 	l.line = 1;
 	l.col = 1;
 
@@ -47,7 +51,7 @@ bool is_whitespace(char c) {
 }
 
 bool is_identifier(char c) {
-	return isdigit(c) || isalpha(c);
+	return isdigit(c) || isalpha(c) || c == '_';
 }
 
 bool is_keyword(char* str) {
@@ -205,16 +209,24 @@ TOKEN read_next(LEXER* l) {
 }
 
 TOKEN lexer_next(LEXER* l) {
+	/*
 	TOKEN tok = l->current;
 	l->last = tok;
 	l->current = TOKEN_NULL;
 	l->line = l->input->line;
 	l->col = l->input->col;
-	return tok.type != TOKEN_TYPE_NULL ? tok : read_next(l);
+	*/
+	//return tok.type != TOKEN_TYPE_NULL ? tok : read_next(l);
+	l->line = l->input->line;
+	l->col = l->input->col;
+	return read_next(l);
 }
 
 TOKEN lexer_peek(LEXER* l) {
-	return l->current.type != TOKEN_TYPE_NULL ? l->current : (l->current = read_next(l));
+	char* ptr = l->input->ptr;
+	TOKEN tok = read_next(l);
+	input_rewind(l->input, ptr);
+	return tok;
 }
 
 bool lexer_eof(LEXER* l) {

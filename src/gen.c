@@ -30,6 +30,7 @@ CODEGEN gen_new() {
 	g.llvm_context = LLVMContextCreate();
 	g.llvm_builder = LLVMCreateBuilderInContext(g.llvm_context);
 	g.module_vec = mdvec_new(2);
+	g.module_name_vec = strvec_new(2);
 
 	g.ast = NULL;
 	g.current_scope = NULL;
@@ -50,6 +51,11 @@ CODEGEN gen_new() {
 }
 
 void gen_delete(CODEGEN* codegen) {
+	mdvec_delete(&codegen->module_vec);
+	for (int i = 0; i < codegen->module_name_vec.size; i++) free(codegen->module_name_vec.buffer[i]);
+	strvec_delete(&codegen->module_name_vec);
+	strvec_delete(&codegen->globals_k);
+	valvec_delete(&codegen->globals_v);
 }
 
 LLVMValueRef find_local_value(SCOPE* s, char* name) {
@@ -173,6 +179,10 @@ LLVMValueRef gen_identifier(CODEGEN* g, IDENTIFIER* i) {
 	return find_named_value(g, g->current_scope, i->name);
 }
 
+LLVMValueRef gen_compound_expr(CODEGEN* g, COMPOUND_EXPR* compound_expr) {
+	return gen_expr(g, compound_expr->expr);
+}
+
 LLVMValueRef create_binary_op(CODEGEN* g, const char* op, LLVMValueRef left, LLVMValueRef right) {
 	LLVMTypeRef ltype = LLVMTypeOf(left);
 	LLVMTypeRef rtype = LLVMTypeOf(right);
@@ -235,11 +245,11 @@ LLVMValueRef gen_unary_op(CODEGEN* g, UNARY_OP* unary_op) {
 
 	if (strcmp(unary_op->op, "*") == 0) return LLVMBuildLoad(g->llvm_builder, expr, "abc");
 	if (strcmp(unary_op->op, "++") == 0 || strcmp(unary_op->op, "--") == 0) {
-		LLVMValueRef initial_value = LLVMBuildLoad(g->llvm_builder, unary_op->expr, "");
+		LLVMValueRef initial_value = LLVMBuildLoad(g->llvm_builder, expr, "");
 		char* op = strcmp(unary_op->op, "++") == 0 ? "+" : "-";
 		LLVMValueRef result = create_binary_op(g, op, initial_value, LLVMConstInt(LLVMInt64Type(), 1, true));
 		LLVMBuildStore(g->llvm_builder, result, expr);
-		return alloc_value_with_content(g, "", unary_op->position ? result : initial_value, g->current_scope);
+		return unary_op->position ? alloc_value_with_content(g, "", initial_value, g->current_scope) : expr;
 	}
 
 	return NULL;
@@ -420,6 +430,16 @@ LLVMValueRef gen_func_decl(CODEGEN* g, FUNC_DECL* func_decl) {
 	return func;
 }
 
+LLVMValueRef gen_import(CODEGEN* g, IMPORT* import) {
+	DYNAMIC_STRING init_func_name = string_new(8);
+	string_push_s(&init_func_name, "__");
+	string_push_s(&init_func_name, import->module_name);
+	string_push_s(&init_func_name, "_init");
+	LLVMValueRef init_func = LLVMAddFunction(g->llvm_module, init_func_name.buffer, LLVMFunctionType(LLVMInt32Type(), NULL, 0, false));
+	return LLVMBuildCall(g->llvm_builder, init_func, NULL, 0, "");
+	string_delete(&init_func_name);
+}
+
 LLVMValueRef gen_expr(CODEGEN* g, EXPRESSION* expr) {
 	switch (expr->type) {
 	case EXPR_TYPE_INT_LITERAL: return gen_int_literal(g, &expr->int_literal);
@@ -428,6 +448,8 @@ LLVMValueRef gen_expr(CODEGEN* g, EXPRESSION* expr) {
 	case EXPR_TYPE_FLOAT_LITERAL: return gen_float_literal(g, &expr->float_literal);
 	case EXPR_TYPE_STRING_LITERAL: return gen_string_literal(g, &expr->string_literal);
 	case EXPR_TYPE_IDENTIFIER: return gen_identifier(g, &expr->identifier);
+	case EXPR_TYPE_COMPOUND_EXPR: return gen_compound_expr(g, &expr->compound_expr);
+
 	case EXPR_TYPE_ASSIGN: return gen_assign(g, &expr->assign);
 	case EXPR_TYPE_BINARY_OP: return gen_binary_op(g, &expr->binary_op);
 	case EXPR_TYPE_UNARY_OP: return gen_unary_op(g, &expr->unary_op);
@@ -439,6 +461,9 @@ LLVMValueRef gen_expr(CODEGEN* g, EXPRESSION* expr) {
 	case EXPR_TYPE_CONTINUE: return gen_continue(g, &expr->continue_statement);
 	case EXPR_TYPE_FUNC_CALL: return gen_func_call(g, &expr->func_call);
 	case EXPR_TYPE_FUNC_DECL: return gen_func_decl(g, &expr->func_decl);
+
+	case EXPR_TYPE_IMPORT: return gen_import(g, &expr->import);
+
 	default: return NULL;
 	}
 }
@@ -459,9 +484,15 @@ LLVMValueRef gen_ast(CODEGEN* g, AST* ast) {
 	return ret_value;
 }
 
-void gen_toplevel(CODEGEN* g, AST* ast) {
+void gen_toplevel(CODEGEN* g, AST* ast, char* module_name) {
+	char* init_func_name = malloc(strlen(module_name) + 8);
+	memcpy(init_func_name + 2, module_name, strlen(module_name));
+	memcpy(init_func_name, "__", 2);
+	memcpy(init_func_name + 2 + strlen(module_name), "_init", 5);
+	init_func_name[strlen(module_name) + 2 + 5] = 0;
+
 	LLVMTypeRef func_type = LLVMFunctionType(LLVMInt32Type(), NULL, 0, false);
-	LLVMValueRef function = LLVMAddFunction(g->llvm_module, "__main_init", func_type);
+	LLVMValueRef function = LLVMAddFunction(g->llvm_module, init_func_name, func_type);
 	LLVMSetLinkage(function, LLVMExternalLinkage);
 	g->llvm_func = function;
 
@@ -472,13 +503,15 @@ void gen_toplevel(CODEGEN* g, AST* ast) {
 
 	LLVMBuildRet(g->llvm_builder, LLVMConstInt(LLVMInt32Type(), 0, true));
 	g->llvm_func = NULL;
+
+	free(init_func_name);
 }
 
-void gen_create_module(CODEGEN* g, AST* ast) {
-	g->llvm_module = LLVMModuleCreateWithNameInContext("main", g->llvm_context);
+void gen_create_module(CODEGEN* g, AST* ast, char* module_name) {
+	g->llvm_module = LLVMModuleCreateWithNameInContext(module_name, g->llvm_context);
 	g->ast = ast;
 
-	gen_toplevel(g, ast);
+	gen_toplevel(g, ast, module_name);
 
 	puts(LLVMPrintModuleToString(g->llvm_module));
 	printf("-----\n\n");
@@ -486,24 +519,15 @@ void gen_create_module(CODEGEN* g, AST* ast) {
 	LLVMRunPassManager(pass_manager, g->llvm_module);
 
 	mdvec_push(&g->module_vec, g->llvm_module);
+	strvec_push(&g->module_name_vec, module_name);
 }
 
-void gen_link(CODEGEN* g) {
-	LLVMModuleRef output_module = LLVMModuleCreateWithNameInContext("__root_module", g->llvm_context);
-	LLVMTypeRef entry_point_arg_types[] = { LLVMInt32Type(), LLVMPointerType(LLVMPointerType(LLVMInt8Type(), 0), 0) };
-	LLVMValueRef entry_point = LLVMAddFunction(output_module, "mainCRTStartup", LLVMFunctionType(LLVMInt32Type(), entry_point_arg_types, 2, false));
-	LLVMPositionBuilderAtEnd(g->llvm_builder, LLVMAppendBasicBlock(entry_point, "entry"));
-	LLVMBuildRet(g->llvm_builder, LLVMBuildCall(g->llvm_builder, LLVMAddFunction(output_module, "__main_init", LLVMFunctionType(LLVMInt32Type(), NULL, 0, false)), NULL, 0, ""));
-
-	for (int i = 0; i < g->module_vec.size; i++) {
-		LLVMLinkModules2(output_module, g->module_vec.buffer[i]);
-	}
-
-	LLVMSetTarget(output_module, LLVM_DEFAULT_TARGET_TRIPLE);
+void output_module(LLVMModuleRef module, char* output_file) {
+	LLVMSetTarget(module, LLVM_DEFAULT_TARGET_TRIPLE);
 
 	LLVMTargetRef target;
 	char* error = NULL;
-	const char* target_triple = LLVMGetTarget(output_module);
+	const char* target_triple = LLVMGetTarget(module);
 	LLVMGetTargetFromTriple(target_triple, &target, &error);
 	if (!target) {
 		printf(error);
@@ -516,15 +540,53 @@ void gen_link(CODEGEN* g) {
 	LLVMCodeModel code_model = LLVMCodeModelDefault;
 	LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, target_triple, cpu, features, level, reloc, code_model);
 
-	char* filename = "main.o";
 	LLVMCodeGenFileType filetype = LLVMObjectFile;
 	error = NULL;
-	LLVMTargetMachineEmitToFile(target_machine, output_module, filename, filetype, &error);
+	LLVMTargetMachineEmitToFile(target_machine, module, output_file, filetype, &error);
 	if (error) {
 		printf(error);
 		return;
 	}
-	system("lld-link main.o msvcrt.lib /subsystem:console /out:a.exe");
+}
+
+void gen_link(CODEGEN* g) {
+	LLVMModuleRef root_module = LLVMModuleCreateWithNameInContext("__root", g->llvm_context);
+	LLVMTypeRef entry_point_arg_types[] = { LLVMInt32Type(), LLVMPointerType(LLVMPointerType(LLVMInt8Type(), 0), 0) };
+	LLVMValueRef entry_point = LLVMAddFunction(root_module, "mainCRTStartup", LLVMFunctionType(LLVMInt32Type(), entry_point_arg_types, 2, false));
+	LLVMPositionBuilderAtEnd(g->llvm_builder, LLVMAppendBasicBlock(entry_point, "entry"));
+	LLVMBuildRet(g->llvm_builder, LLVMBuildCall(g->llvm_builder, LLVMAddFunction(root_module, "__main_init", LLVMFunctionType(LLVMInt32Type(), NULL, 0, false)), NULL, 0, ""));
+
+	//output_module(root_module, "__root.o");
+	for (int i = 0; i < g->module_vec.size; i++) {
+		/*
+		int len = strlen(g->module_name_vec.buffer[i]);
+		char* objfile_name = malloc(len + 3);
+		memcpy(objfile_name, g->module_name_vec.buffer[i], len);
+		objfile_name[len] = '.';
+		objfile_name[len + 1] = 'o';
+		objfile_name[len + 2] = 0;
+		output_module(g->module_vec.buffer[i], objfile_name);
+		free(objfile_name);
+		*/
+		LLVMLinkModules2(root_module, g->module_vec.buffer[i]);
+	}
+	output_module(root_module, "out.o");
+
+	DYNAMIC_STRING link_cmd = string_new(16);
+	//string_push_s(&link_cmd, "lld-link __root.o ");
+	string_push_s(&link_cmd, "lld-link out.o ");
+	/*
+	for (int i = 0; i < g->module_vec.size; i++) {
+		string_push_s(&link_cmd, g->module_name_vec.buffer[i]);
+		string_push(&link_cmd, '.');
+		string_push(&link_cmd, 'o');
+		string_push(&link_cmd, ' ');
+	}
+	*/
+	string_push_s(&link_cmd, "msvcrt.lib /subsystem:console /out:a.exe");
+	system(link_cmd.buffer);
+	//system("lld-link out.o msvcrt.lib /subsystem:console /out:a.exe");
+	string_delete(&link_cmd);
 
 	printf("### TEST ###\n");
 	system("a.exe");

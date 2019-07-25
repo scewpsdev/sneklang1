@@ -30,24 +30,25 @@ void skip_all_separators(PARSER* p) {
 }
 
 bool next_is_keyword(PARSER* p, const char* kw) {
+	char* ptr = p->input->input->ptr;
 	skip_all_separators(p);
 	TOKEN tok = lexer_peek(p->input);
+	input_rewind(p->input->input, ptr);
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_KEYWORD && (kw[0] == 0 || strcmp(kw, tok.value) == 0);
 }
 
 bool next_is_punc(PARSER* p, const char c) {
-	skip_all_separators(p);
 	TOKEN tok = lexer_peek(p->input);
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_PUNC && (c == 0 || tok.value[0] == c);
 }
 
 bool next_is_op(PARSER* p, const char* c) {
-	skip_all_separators(p);
 	TOKEN tok = lexer_peek(p->input);
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_OP && (c[0] == 0 || strcmp(tok.value, c) == 0);
 }
 
 void skip_keyword(PARSER* p, const char* kw) {
+	skip_all_separators(p);
 	if (next_is_keyword(p, kw)) lexer_next(p->input);
 	else lexer_error(p->input, "Keyword '%s' expected", kw);
 }
@@ -92,10 +93,9 @@ EXPR_VEC delimited_expr(PARSER* p, char start, char end, char separator, EXPRESS
 EXPRESSION maybe_unary(PARSER* p, EXPRESSION e) {
 	if (next_is_punc(p, '(')) return maybe_unary(p, parse_call(p, e));
 	if (next_is_op(p, "++") || next_is_op(p, "--")) {
-		TOKEN op_token = lexer_next(p->input);
+		char* op = lexer_next(p->input).value;
 		EXPRESSION* expr = malloc(sizeof(EXPRESSION));
 		*expr = e;
-		char* op = strcmp(op_token.value, "++") == 0 ? "+=" : "-=";
 		return maybe_unary(p, (EXPRESSION) { EXPR_TYPE_UNARY_OP, .assign = { op, true, expr } });
 	}
 	return e;
@@ -120,6 +120,14 @@ EXPRESSION maybe_binary(PARSER* p, EXPRESSION e, int prec) {
 		}
 	}
 	return e;
+}
+
+EXPRESSION parse_compound_expr(PARSER* p) {
+	skip_punc(p, '(');
+	EXPRESSION* expr = malloc(sizeof(EXPRESSION));
+	*expr = parse_expr(p);
+	skip_punc(p, ')');
+	return (EXPRESSION) { EXPR_TYPE_COMPOUND_EXPR, .compound_expr = { expr } };
 }
 
 EXPRESSION parse_compound(PARSER* p) {
@@ -222,11 +230,10 @@ VAR_DECL parse_arg(PARSER* p) {
 
 VAR_DECL_VEC parse_arg_list(PARSER* p) {
 	VAR_DECL_VEC vec = vdvec_new(2);
-	while (true) {
+	while (!next_is_punc(p, ')')) {
+		if (next_is_punc(p, ',')) skip_punc(p, ',');
 		VAR_DECL arg = parse_arg(p);
 		vdvec_push(&vec, arg);
-		if (!next_is_punc(p, ',')) break;
-		skip_punc(p, ',');
 	}
 	return vec;
 }
@@ -242,10 +249,17 @@ EXPRESSION parse_func_decl(PARSER* p) {
 	return (EXPRESSION) { EXPR_TYPE_FUNC_DECL, .func_decl = (FUNC_DECL){ funcname, args, num_args } };
 }
 
+EXPRESSION parse_import(PARSER* p) {
+	skip_keyword(p, KEYWORD_IMPORT);
+	char* module_name = lexer_next(p->input).value;
+	return (EXPRESSION) { EXPR_TYPE_IMPORT, .import = (IMPORT){ module_name } };
+}
+
 EXPRESSION parse_atom(PARSER* p) {
-	while (lexer_peek(p->input).type == TOKEN_TYPE_SEPARATOR) lexer_next(p->input);
+	skip_all_separators(p);
 
 	if (next_is_keyword(p, KEYWORD_TRUE) || next_is_keyword(p, KEYWORD_FALSE)) return (EXPRESSION) { EXPR_TYPE_BOOL_LITERAL, .bool_literal = { strcmp(lexer_next(p->input).value, KEYWORD_FALSE) } };
+	if (next_is_punc(p, '(')) return parse_compound_expr(p);
 	if (next_is_op(p, "*") || next_is_op(p, "-") || next_is_op(p, "+") || next_is_op(p, "++") || next_is_op(p, "--")) {
 		char* op = lexer_next(p->input).value;
 		EXPRESSION* expr = malloc(sizeof(EXPRESSION));
@@ -260,6 +274,8 @@ EXPRESSION parse_atom(PARSER* p) {
 	if (next_is_keyword(p, KEYWORD_BREAK)) return parse_break(p);
 	if (next_is_keyword(p, KEYWORD_CONTINUE)) return parse_continue(p);
 	if (next_is_keyword(p, KEYWORD_FUNC_DECL)) return parse_func_decl(p);
+
+	if (next_is_keyword(p, KEYWORD_IMPORT)) return parse_import(p);
 
 	TOKEN tok = lexer_next(p->input);
 	switch (tok.type) {
@@ -283,7 +299,7 @@ AST parse_ast(PARSER* p) {
 	skip_all_separators(p);
 	while (!lexer_eof(p->input) && !next_is_punc(p, '}')) {
 		evec_push(&expressions, parse_expr(p));
-		if (!lexer_eof(p->input) && p->input->last.type != TOKEN_TYPE_SEPARATOR) skip_separator(p);
+		if (!lexer_eof(p->input)/* && p->input->last.type != TOKEN_TYPE_SEPARATOR*/) skip_separator(p);
 	}
 	return (AST) { expressions.buffer, expressions.size };
 }

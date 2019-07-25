@@ -44,6 +44,12 @@ void print_identifier(AST_PRINTER* p, IDENTIFIER* identifier) {
 	printf(identifier->name);
 }
 
+void print_compound_expr(AST_PRINTER* p, COMPOUND_EXPR* compound_expr) {
+	putchar('(');
+	print_expr(p, compound_expr->expr);
+	putchar(')');
+}
+
 void print_func_call(AST_PRINTER* p, FUNC_CALL* func_call) {
 	print_expr(p, func_call->callee);
 	putchar('(');
@@ -136,6 +142,8 @@ void print_expr(AST_PRINTER* p, EXPRESSION* expr) {
 	case EXPR_TYPE_FLOAT_LITERAL: print_float_literal(p, &expr->float_literal); break;
 	case EXPR_TYPE_STRING_LITERAL: print_string_literal(p, &expr->string_literal); break;
 	case EXPR_TYPE_IDENTIFIER: print_identifier(p, &expr->identifier); break;
+	case EXPR_TYPE_COMPOUND_EXPR: print_compound_expr(p, &expr->compound_expr); break;
+
 	case EXPR_TYPE_FUNC_CALL: print_func_call(p, &expr->func_call); break;
 	case EXPR_TYPE_ASSIGN: print_assign(p, &expr->assign); break;
 	case EXPR_TYPE_BINARY_OP: print_binary_op(p, &expr->binary_op); break;

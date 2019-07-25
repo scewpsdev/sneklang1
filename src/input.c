@@ -35,8 +35,12 @@ bool input_eof(INPUTSTREAM* i) {
 	return *i->ptr == 0;
 }
 
+void input_rewind(INPUTSTREAM* i, char* ptr) {
+	i->ptr = ptr;
+}
+
 void input_reset(INPUTSTREAM* i) {
-	i->ptr = i->buffer;
+	input_rewind(i, i->buffer);
 	i->line = 1;
 	i->col = 1;
 }

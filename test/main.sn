@@ -1,41 +1,5 @@
-// This is a line comment
-/* This is a block comment */
+use test_module
 
-decl putchar(*i32 Char)
 decl printf(i8 format)
 
-b = 102
-c = 'c'
-d = true
-e = 99.5
-f = "hello world\n"
-
-printf(f)
-putchar(c)
-putchar(i64(e))
-putchar(99 + d)
-putchar('\n')
-
-var = if c == 'd' {
-	putchar('_')
-	'Y'
-} else {
-	putchar('&')
-	'N'
-}
-putchar(var)
-
-i = 0
-while i < 5 {
-	putchar('W')
-	i = i + 1
-}
-
-i = 0
-loop {
-	if i >= 5 break
-	++i
-	putchar('V')
-}
-
-putchar('\n')
+printf("hello ")

@@ -62,6 +62,8 @@ DECL_DYNAMIC_VECTOR(EXPRESSION, EXPR_VEC, evec)
 DECL_DYNAMIC_VECTOR(LLVMModuleRef, MODULE_VEC, mdvec)
 DECL_DYNAMIC_VECTOR(LLVMValueRef, VALUE_VEC, valvec)
 
+void string_push_s(DYNAMIC_STRING* str, char* s);
+
 /*
 typedef struct DYNAMIC_STRING_t {
 	char* buffer;

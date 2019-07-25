@@ -24,6 +24,7 @@ typedef struct CODEGEN_t {
 	LLVMContextRef llvm_context;
 	LLVMBuilderRef llvm_builder;
 	MODULE_VEC module_vec;
+	STRING_VEC module_name_vec;
 
 	AST* ast;
 	SCOPE* current_scope;
@@ -38,5 +39,5 @@ typedef struct CODEGEN_t {
 CODEGEN gen_new();
 void gen_delete(CODEGEN* codegen);
 
-void gen_create_module(CODEGEN* g, AST* ast);
+void gen_create_module(CODEGEN* g, AST* ast, char* module_name);
 void gen_link(CODEGEN* g);

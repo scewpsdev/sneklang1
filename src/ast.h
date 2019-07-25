@@ -13,6 +13,7 @@ enum EXPR_TYPE {
 	EXPR_TYPE_FLOAT_LITERAL,
 	EXPR_TYPE_STRING_LITERAL,
 	EXPR_TYPE_IDENTIFIER,
+	EXPR_TYPE_COMPOUND_EXPR,
 
 	EXPR_TYPE_ASSIGN,
 	EXPR_TYPE_BINARY_OP,
@@ -25,7 +26,9 @@ enum EXPR_TYPE {
 	EXPR_TYPE_CONTINUE,
 	EXPR_TYPE_FUNC_CALL,
 
-	EXPR_TYPE_FUNC_DECL
+	EXPR_TYPE_FUNC_DECL,
+
+	EXPR_TYPE_IMPORT
 };
 
 typedef struct EXPRESSION_t EXPRESSION;
@@ -58,6 +61,10 @@ typedef struct STRING_t {
 typedef struct IDENTIFIER_t {
 	char* name;
 } IDENTIFIER;
+
+typedef struct COMPOUND_EXPR_t {
+	EXPRESSION* expr;
+} COMPOUND_EXPR;
 
 typedef struct ASSIGN_t {
 	char* op;
@@ -121,6 +128,10 @@ typedef struct FUNC_DECL_t {
 	uint8_t num_args;
 } FUNC_DECL;
 
+typedef struct IMPORT_t {
+	char* module_name;
+} IMPORT;
+
 typedef struct EXPRESSION_t {
 	uint8_t type;
 	union {
@@ -130,6 +141,7 @@ typedef struct EXPRESSION_t {
 		FLOAT float_literal;
 		STRING string_literal;
 		IDENTIFIER identifier;
+		COMPOUND_EXPR compound_expr;
 
 		ASSIGN assign;
 		BINARY_OP binary_op;
@@ -142,6 +154,8 @@ typedef struct EXPRESSION_t {
 		CONTINUE continue_statement;
 		FUNC_CALL func_call;
 		FUNC_DECL func_decl;
+
+		IMPORT import;
 	};
 } EXPRESSION;
 
