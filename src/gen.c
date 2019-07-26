@@ -430,6 +430,23 @@ LLVMValueRef gen_func_decl(CODEGEN* g, FUNC_DECL* func_decl) {
 	return func;
 }
 
+LLVMValueRef gen_func_def(CODEGEN* g, FUNC_DEF* func_def) {
+	LLVMValueRef func = gen_func_decl(g, &func_def->decl);
+	LLVMSetLinkage(func, LLVMPrivateLinkage);
+	LLVMValueRef parent_func = g->llvm_func;
+	g->llvm_func = func;
+
+	LLVMBasicBlockRef entry_block = LLVMAppendBasicBlock(func, "entry");
+	LLVMPositionBuilderAtEnd(g->llvm_builder, entry_block);
+
+	gen_expr(g, func_def->body);
+
+	LLVMBuildRet(g->llvm_builder, LLVMConstInt(LLVMInt32Type(), 0, true));
+	g->llvm_func = parent_func;
+
+	return func;
+}
+
 LLVMValueRef gen_import(CODEGEN* g, IMPORT* import) {
 	DYNAMIC_STRING init_func_name = string_new(8);
 	string_push_s(&init_func_name, "__");

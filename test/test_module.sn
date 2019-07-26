@@ -1,3 +1,9 @@
 decl printf(i8 format)
 
-printf("world\n")
+def print_thing(i8 str) {
+	printf(str)
+}
+
+/*
+print_thing("oof  ")
+*/

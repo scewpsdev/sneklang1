@@ -249,6 +249,19 @@ EXPRESSION parse_func_decl(PARSER* p) {
 	return (EXPRESSION) { EXPR_TYPE_FUNC_DECL, .func_decl = (FUNC_DECL){ funcname, args, num_args } };
 }
 
+EXPRESSION parse_func_def(PARSER* p) {
+	skip_keyword(p, KEYWORD_FUNC_DEF);
+	char* funcname = lexer_next(p->input).value;
+	skip_punc(p, '(');
+	VAR_DECL_VEC argvec = parse_arg_list(p);
+	VAR_DECL* args = argvec.buffer;
+	int num_args = argvec.size;
+	skip_punc(p, ')');
+	EXPRESSION* body = malloc(sizeof(EXPRESSION));
+	*body = parse_expr(p);
+	return (EXPRESSION) { EXPR_TYPE_FUNC_DEF, .func_def = (FUNC_DEF){ (FUNC_DECL) { funcname, args, num_args }, body } };
+}
+
 EXPRESSION parse_import(PARSER* p) {
 	skip_keyword(p, KEYWORD_IMPORT);
 	char* module_name = lexer_next(p->input).value;
@@ -273,7 +286,9 @@ EXPRESSION parse_atom(PARSER* p) {
 	if (next_is_keyword(p, KEYWORD_WHILE)) return parse_while(p);
 	if (next_is_keyword(p, KEYWORD_BREAK)) return parse_break(p);
 	if (next_is_keyword(p, KEYWORD_CONTINUE)) return parse_continue(p);
+
 	if (next_is_keyword(p, KEYWORD_FUNC_DECL)) return parse_func_decl(p);
+	if (next_is_keyword(p, KEYWORD_FUNC_DEF)) return parse_func_def(p);
 
 	if (next_is_keyword(p, KEYWORD_IMPORT)) return parse_import(p);
 
@@ -290,7 +305,7 @@ EXPRESSION parse_atom(PARSER* p) {
 
 EXPRESSION parse_expr(PARSER* p) {
 	EXPRESSION atom = parse_atom(p);
-	if (atom.type == TOKEN_TYPE_NULL) return parse_expr(p);
+	if (atom.type == TOKEN_TYPE_NULL) return (EXPRESSION) { 0 }; //return parse_expr(p); // TODO error
 	else return maybe_binary(p, maybe_unary(p, atom), 0);
 }
 
@@ -401,6 +416,11 @@ void delete_func_call(FUNC_CALL* func_call) {
 
 void delete_func_decl(FUNC_DECL* func_decl) {
 	free(func_decl->args);
+}
+
+void delete_func_def(FUNC_DEF* func_def) {
+	delete_func_decl(&func_def->decl);
+	delete_expr(func_def->body);
 }
 
 void delete_expr(EXPRESSION* expr) {

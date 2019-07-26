@@ -134,6 +134,17 @@ void print_func_decl(AST_PRINTER* p, FUNC_DECL* func_decl) {
 	putchar(')');
 }
 
+void print_func_def(AST_PRINTER* p, FUNC_DEF* func_def) {
+	printf("def %s(", func_def->decl.funcname);
+	print_arg_list(p, func_def->decl.args, func_def->decl.num_args);
+	printf(") ");
+	print_expr(p, func_def->body);
+}
+
+void print_import(AST_PRINTER* p, IMPORT* import) {
+	printf("import %s", import->module_name);
+}
+
 void print_expr(AST_PRINTER* p, EXPRESSION* expr) {
 	switch (expr->type) {
 	case EXPR_TYPE_INT_LITERAL: print_int_literal(p, &expr->int_literal); break;
@@ -153,7 +164,12 @@ void print_expr(AST_PRINTER* p, EXPRESSION* expr) {
 	case EXPR_TYPE_LOOP: print_loop(p, &expr->loop); break;
 	case EXPR_TYPE_BREAK: print_break(p, &expr->break_statement); break;
 	case EXPR_TYPE_CONTINUE: print_continue(p, &expr->continue_statement); break;
+
 	case EXPR_TYPE_FUNC_DECL: print_func_decl(p, &expr->func_decl); break;
+	case EXPR_TYPE_FUNC_DEF: print_func_def(p, &expr->func_def); break;
+
+	case EXPR_TYPE_IMPORT: print_import(p, &expr->import); break;
+
 	default: break;
 	}
 }

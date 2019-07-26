@@ -27,6 +27,7 @@ enum EXPR_TYPE {
 	EXPR_TYPE_FUNC_CALL,
 
 	EXPR_TYPE_FUNC_DECL,
+	EXPR_TYPE_FUNC_DEF,
 
 	EXPR_TYPE_IMPORT
 };
@@ -128,6 +129,11 @@ typedef struct FUNC_DECL_t {
 	uint8_t num_args;
 } FUNC_DECL;
 
+typedef struct FUNC_DEF_t {
+	FUNC_DECL decl;
+	EXPRESSION* body;
+} FUNC_DEF;
+
 typedef struct IMPORT_t {
 	char* module_name;
 } IMPORT;
@@ -154,6 +160,7 @@ typedef struct EXPRESSION_t {
 		CONTINUE continue_statement;
 		FUNC_CALL func_call;
 		FUNC_DECL func_decl;
+		FUNC_DEF func_def;
 
 		IMPORT import;
 	};
