@@ -53,17 +53,22 @@ int main(int argc, char** argv) {
 
 		PARSER parser = parser_new(&lexer);
 		AST ast = parse_ast(&parser);
+		strvec_push(&gen.module_name_vec, name);
+		astvec_push(&gen.module_ast_vec, ast);
 		test_parser(&ast);
 
-		printf("### LLVM ###\n");
-		gen_create_module(&gen, &ast, name);
+		//parser_delete(&parser);
+		//lexer_delete(&lexer);
+		//input_delete(&input);
+	}
 
-		delete_ast(&ast);
-		parser_delete(&parser);
-		lexer_delete(&lexer);
-		input_delete(&input);
+	printf("### LLVM ###\n");
+	for (int i = 0; i < gen.module_ast_vec.size; i++) {
+		gen_create_module(&gen, &gen.module_ast_vec.buffer[i], gen.module_name_vec.buffer[i]);
 	}
 	gen_link(&gen);
+
+	for (int i = 0; i < gen.module_ast_vec.size; i++) delete_ast(&gen.module_ast_vec.buffer[i]);
 	gen_delete(&gen);
 
 	return 0;

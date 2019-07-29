@@ -34,11 +34,6 @@ enum EXPR_TYPE {
 
 typedef struct EXPRESSION_t EXPRESSION;
 
-typedef struct TYPENAME_t {
-	char* name;
-	bool cpy;
-} TYPE;
-
 typedef struct INT_t {
 	int64_t value;
 } INT;
@@ -117,6 +112,11 @@ typedef struct FUNC_CALL_t {
 	EXPRESSION* args;
 	uint8_t num_args;
 } FUNC_CALL;
+
+typedef struct TYPE_t {
+	char* name;
+	bool cpy;
+} TYPE;
 
 typedef struct VAR_DECL_t {
 	TYPE type;

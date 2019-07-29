@@ -1,9 +1,0 @@
-decl printf(i8 format)
-
-def print_thing(i8 str) {
-	printf(str)
-}
-
-/*
-print_thing("oof  ")
-*/

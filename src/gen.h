@@ -23,8 +23,9 @@ typedef struct SCOPE_t {
 typedef struct CODEGEN_t {
 	LLVMContextRef llvm_context;
 	LLVMBuilderRef llvm_builder;
-	MODULE_VEC module_vec;
 	STRING_VEC module_name_vec;
+	AST_VEC module_ast_vec;
+	MODULE_VEC module_vec;
 
 	AST* ast;
 	SCOPE* current_scope;

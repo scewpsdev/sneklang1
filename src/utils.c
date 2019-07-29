@@ -9,11 +9,19 @@ DEF_DYNAMIC_VECTOR(char*, STRING_VEC, strvec)
 DEF_DYNAMIC_VECTOR(VAR_DECL, VAR_DECL_VEC, vdvec)
 DEF_DYNAMIC_VECTOR(EXPRESSION, EXPR_VEC, evec)
 DEF_DYNAMIC_VECTOR(LLVMModuleRef, MODULE_VEC, mdvec)
+DEF_DYNAMIC_VECTOR(AST, AST_VEC, astvec)
 DEF_DYNAMIC_VECTOR(LLVMValueRef, VALUE_VEC, valvec)
 
 void string_push_s(DYNAMIC_STRING* str, char* s) {
 	int len = strlen(s);
 	for (int i = 0; i < len; i++) string_push(str, s[i]);
+}
+
+char* copy_str(char* str) {
+	int len = strlen(str);
+	char* ptr = malloc(len + 1);
+	memcpy(ptr, str, len + 1);
+	return ptr;
 }
 
 /*

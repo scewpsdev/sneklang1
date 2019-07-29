@@ -29,21 +29,26 @@ void skip_all_separators(PARSER* p) {
 	}
 }
 
-bool next_is_keyword(PARSER* p, const char* kw) {
+TOKEN peek_non_separator(PARSER* p) {
 	char* ptr = p->input->input->ptr;
 	skip_all_separators(p);
 	TOKEN tok = lexer_peek(p->input);
 	input_rewind(p->input->input, ptr);
+	return tok;
+}
+
+bool next_is_keyword(PARSER* p, const char* kw) {
+	TOKEN tok = peek_non_separator(p);
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_KEYWORD && (kw[0] == 0 || strcmp(kw, tok.value) == 0);
 }
 
 bool next_is_punc(PARSER* p, const char c) {
-	TOKEN tok = lexer_peek(p->input);
+	TOKEN tok = peek_non_separator(p);
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_PUNC && (c == 0 || tok.value[0] == c);
 }
 
 bool next_is_op(PARSER* p, const char* c) {
-	TOKEN tok = lexer_peek(p->input);
+	TOKEN tok = peek_non_separator(p);
 	return tok.type != TOKEN_TYPE_NULL && tok.type == TOKEN_TYPE_OP && (c[0] == 0 || strcmp(tok.value, c) == 0);
 }
 
@@ -54,11 +59,13 @@ void skip_keyword(PARSER* p, const char* kw) {
 }
 
 void skip_punc(PARSER* p, char c) {
+	skip_all_separators(p);
 	if (next_is_punc(p, c)) lexer_next(p->input);
 	else lexer_error(p->input, "TOKEN '%c' expected", c);
 }
 
 void skip_op(PARSER* p, const char* op) {
+	skip_all_separators(p);
 	if (next_is_op(p, op)) lexer_next(p->input);
 	else lexer_error(p->input, "TOKEN '%s' expected", op);
 }
@@ -93,7 +100,7 @@ EXPR_VEC delimited_expr(PARSER* p, char start, char end, char separator, EXPRESS
 EXPRESSION maybe_unary(PARSER* p, EXPRESSION e) {
 	if (next_is_punc(p, '(')) return maybe_unary(p, parse_call(p, e));
 	if (next_is_op(p, "++") || next_is_op(p, "--")) {
-		char* op = lexer_next(p->input).value;
+		char* op = copy_str(lexer_next(p->input).value);
 		EXPRESSION* expr = malloc(sizeof(EXPRESSION));
 		*expr = e;
 		return maybe_unary(p, (EXPRESSION) { EXPR_TYPE_UNARY_OP, .assign = { op, true, expr } });
@@ -113,9 +120,9 @@ EXPRESSION maybe_binary(PARSER* p, EXPRESSION e, int prec) {
 			*right = maybe_binary(p, maybe_unary(p, parse_atom(p)), token_prec);
 			if (strcmp(token.value, "=") == 0
 				|| strlen(token.value) == 2 && (token.value[0] == '+' || token.value[0] == '-' || token.value[0] == '*' || token.value[0] == '/' || token.value[0] == '%') && token.value[1] == '=') {
-				return maybe_unary(p, maybe_binary(p, (EXPRESSION) { EXPR_TYPE_ASSIGN, .assign = { token.value, left, right } }, prec));
+				return maybe_unary(p, maybe_binary(p, (EXPRESSION) { EXPR_TYPE_ASSIGN, .assign = { copy_str(token.value), left, right } }, prec));
 			} else {
-				return maybe_unary(p, maybe_binary(p, (EXPRESSION) { EXPR_TYPE_BINARY_OP, .binary_op = (BINARY_OP){ token.value, left, right } }, prec));
+				return maybe_unary(p, maybe_binary(p, (EXPRESSION) { EXPR_TYPE_BINARY_OP, .binary_op = (BINARY_OP){ copy_str(token.value), left, right } }, prec));
 			}
 		}
 	}
@@ -216,7 +223,7 @@ TYPE parse_type(PARSER* p) {
 		cpy = true;
 		skip_op(p, "*");
 	}
-	name = lexer_next(p->input).value;
+	name = copy_str(lexer_next(p->input).value);
 
 	return (TYPE) { name, cpy };
 }
@@ -224,7 +231,7 @@ TYPE parse_type(PARSER* p) {
 VAR_DECL parse_arg(PARSER* p) {
 	TYPE type = parse_type(p);
 	char* name = NULL;
-	if (lexer_peek(p->input).type == TOKEN_TYPE_IDENTIFIER) name = lexer_next(p->input).value;
+	if (lexer_peek(p->input).type == TOKEN_TYPE_IDENTIFIER) name = copy_str(lexer_next(p->input).value);
 	return (VAR_DECL) { type, name };
 }
 
@@ -240,7 +247,7 @@ VAR_DECL_VEC parse_arg_list(PARSER* p) {
 
 EXPRESSION parse_func_decl(PARSER* p) {
 	skip_keyword(p, KEYWORD_FUNC_DECL);
-	char* funcname = lexer_next(p->input).value;
+	char* funcname = copy_str(lexer_next(p->input).value);
 	skip_punc(p, '(');
 	VAR_DECL_VEC argvec = parse_arg_list(p);
 	VAR_DECL* args = argvec.buffer;
@@ -251,7 +258,7 @@ EXPRESSION parse_func_decl(PARSER* p) {
 
 EXPRESSION parse_func_def(PARSER* p) {
 	skip_keyword(p, KEYWORD_FUNC_DEF);
-	char* funcname = lexer_next(p->input).value;
+	char* funcname = copy_str(lexer_next(p->input).value);
 	skip_punc(p, '(');
 	VAR_DECL_VEC argvec = parse_arg_list(p);
 	VAR_DECL* args = argvec.buffer;
@@ -264,7 +271,7 @@ EXPRESSION parse_func_def(PARSER* p) {
 
 EXPRESSION parse_import(PARSER* p) {
 	skip_keyword(p, KEYWORD_IMPORT);
-	char* module_name = lexer_next(p->input).value;
+	char* module_name = copy_str(lexer_next(p->input).value);
 	return (EXPRESSION) { EXPR_TYPE_IMPORT, .import = (IMPORT){ module_name } };
 }
 
@@ -274,7 +281,7 @@ EXPRESSION parse_atom(PARSER* p) {
 	if (next_is_keyword(p, KEYWORD_TRUE) || next_is_keyword(p, KEYWORD_FALSE)) return (EXPRESSION) { EXPR_TYPE_BOOL_LITERAL, .bool_literal = { strcmp(lexer_next(p->input).value, KEYWORD_FALSE) } };
 	if (next_is_punc(p, '(')) return parse_compound_expr(p);
 	if (next_is_op(p, "*") || next_is_op(p, "-") || next_is_op(p, "+") || next_is_op(p, "++") || next_is_op(p, "--")) {
-		char* op = lexer_next(p->input).value;
+		char* op = copy_str(lexer_next(p->input).value);
 		EXPRESSION* expr = malloc(sizeof(EXPRESSION));
 		*expr = maybe_unary(p, parse_atom(p));
 		return (EXPRESSION) { EXPR_TYPE_UNARY_OP, .unary_op = (UNARY_OP){ op, false, expr } };
@@ -297,16 +304,17 @@ EXPRESSION parse_atom(PARSER* p) {
 	case TOKEN_TYPE_INT: return (EXPRESSION) { EXPR_TYPE_INT_LITERAL, .int_literal = { strtol(tok.value, NULL, 10) } };
 	case TOKEN_TYPE_CHAR: return (EXPRESSION) { EXPR_TYPE_CHAR_LITERAL, .char_literal = { tok.value[0] } };
 	case TOKEN_TYPE_FLOAT: return (EXPRESSION) { EXPR_TYPE_FLOAT_LITERAL, .float_literal = { strtod(tok.value, NULL) } };
-	case TOKEN_TYPE_STRING: return (EXPRESSION) { EXPR_TYPE_STRING_LITERAL, .string_literal = { tok.value } };
-	case TOKEN_TYPE_IDENTIFIER: return (EXPRESSION) { EXPR_TYPE_IDENTIFIER, .identifier = { tok.value } };
+	case TOKEN_TYPE_STRING: return (EXPRESSION) { EXPR_TYPE_STRING_LITERAL, .string_literal = { copy_str(tok.value) } };
+	case TOKEN_TYPE_IDENTIFIER: return (EXPRESSION) { EXPR_TYPE_IDENTIFIER, .identifier = { copy_str(tok.value) } };
 	default: return (EXPRESSION) { 0 };
 	}
 }
 
 EXPRESSION parse_expr(PARSER* p) {
 	EXPRESSION atom = parse_atom(p);
-	if (atom.type == TOKEN_TYPE_NULL) return (EXPRESSION) { 0 }; //return parse_expr(p); // TODO error
-	else return maybe_binary(p, maybe_unary(p, atom), 0);
+	if (atom.type != TOKEN_TYPE_NULL) return maybe_binary(p, maybe_unary(p, atom), 0);
+	return (EXPRESSION) { 0 };
+	//return parse_expr(p); //return (EXPRESSION) { 0 }; //return parse_expr(p); // TODO error
 }
 
 AST parse_ast(PARSER* p) {
@@ -335,30 +343,45 @@ void delete_float_literal(FLOAT* f) {
 }
 
 void delete_string_literal(STRING* str) {
+	free(str->value);
+	str->value = NULL;
 }
 
 void delete_identifier(IDENTIFIER* i) {
+	free(i->name);
+	i->name = NULL;
 }
 
 void delete_assign(ASSIGN* assign) {
+	free(assign->op);
+	assign->op = NULL;
+
 	delete_expr(assign->left);
 	free(assign->left);
 	assign->left = NULL;
+
 	delete_expr(assign->right);
 	free(assign->right);
 	assign->right = NULL;
 }
 
 void delete_binary_op(BINARY_OP* binary_op) {
+	free(binary_op->op);
+	binary_op->op = NULL;
+
 	delete_expr(binary_op->left);
 	free(binary_op->left);
 	binary_op->left = NULL;
+
 	delete_expr(binary_op->right);
 	free(binary_op->right);
 	binary_op->right = NULL;
 }
 
 void delete_unary_op(UNARY_OP* unary_op) {
+	free(unary_op->op);
+	unary_op->op = NULL;
+
 	delete_expr(unary_op->expr);
 	free(unary_op->expr);
 	unary_op->expr = NULL;
@@ -414,13 +437,31 @@ void delete_func_call(FUNC_CALL* func_call) {
 	}
 }
 
+void delete_type(TYPE* type) {
+	free(type->name);
+	type->name = NULL;
+}
+
+void delete_var_decl(VAR_DECL* var_decl) {
+	free(var_decl->name);
+	var_decl->name = NULL;
+}
+
 void delete_func_decl(FUNC_DECL* func_decl) {
+	free(func_decl->funcname);
+	func_decl->funcname = NULL;
 	free(func_decl->args);
+	func_decl->args = NULL;
 }
 
 void delete_func_def(FUNC_DEF* func_def) {
 	delete_func_decl(&func_def->decl);
 	delete_expr(func_def->body);
+}
+
+void delete_import(IMPORT* import) {
+	free(import->module_name);
+	import->module_name = NULL;
 }
 
 void delete_expr(EXPRESSION* expr) {
@@ -440,8 +481,12 @@ void delete_expr(EXPRESSION* expr) {
 	case EXPR_TYPE_LOOP: delete_loop(&expr->loop); break;
 	case EXPR_TYPE_BREAK: delete_break(&expr->break_statement); break;
 	case EXPR_TYPE_CONTINUE: delete_continue(&expr->continue_statement); break;
+
 	case EXPR_TYPE_FUNC_CALL: delete_func_call(&expr->func_call); break;
 	case EXPR_TYPE_FUNC_DECL: delete_func_decl(&expr->func_decl); break;
+
+	case EXPR_TYPE_IMPORT: delete_import(&expr->import); break;
+
 	default:  break;
 	}
 }
