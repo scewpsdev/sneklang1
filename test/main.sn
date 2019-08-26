@@ -1,12 +1,10 @@
 /*
-using(test_module, console)
-fix error in parse_expr()
+- using(test_module, console)
+- bitwise operators
 */
+
+use test_module
 
 decl printf(i8 format)
 
-def print_thing(i8 str) {
-	printf(str)
-}
-
-print_thing("oof")
+//printf("main")

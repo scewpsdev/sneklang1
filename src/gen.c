@@ -416,7 +416,7 @@ LLVMValueRef gen_func_call(CODEGEN* g, FUNC_CALL* func_call) {
 			}
 		}
 	}
-	LLVMValueRef ret_val = LLVMBuildCall(g->llvm_builder, callee, args, func_call->num_args, "");
+	LLVMValueRef ret_val = LLVMBuildCall2(g->llvm_builder, LLVMGetElementType(LLVMTypeOf(callee)), callee, args, func_call->num_args, "");
 	free(args);
 	return ret_val;
 }

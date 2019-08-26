@@ -1,0 +1,7 @@
+decl printf(i8 format)
+
+def print_thing(i8 str) {
+	printf(str)
+}
+
+printf("test_module startup")

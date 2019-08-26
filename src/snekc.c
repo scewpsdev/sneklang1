@@ -57,9 +57,9 @@ int main(int argc, char** argv) {
 		astvec_push(&gen.module_ast_vec, ast);
 		test_parser(&ast);
 
-		//parser_delete(&parser);
-		//lexer_delete(&lexer);
-		//input_delete(&input);
+		parser_delete(&parser);
+		lexer_delete(&lexer);
+		input_delete(&input);
 	}
 
 	printf("### LLVM ###\n");

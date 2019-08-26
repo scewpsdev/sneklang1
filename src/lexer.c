@@ -160,7 +160,7 @@ void skip_line_comment(LEXER* l) {
 	input_next(l->input);
 	input_next(l->input);
 	read_while(l, not_newline);
-	input_next(l->input);
+	if (!input_eof(l->input)) input_next(l->input);
 }
 
 void skip_block_comment(LEXER* l) {
